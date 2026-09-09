@@ -10,12 +10,13 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="app" src="legacy.html" title="Teacher Command Centre"></iframe>
+<!-- Chalkboard redesign v2: direct GitHub Pages entry point -->
+<iframe id="app" src="legacy.html?v=chalkboard-20260909-1124" title="Teacher Command Centre"></iframe>
 <script>
 const frame=document.getElementById('app');
-frame.addEventListener('load',()=>{
+function applyChalkUpgrade(){
   const d=frame.contentDocument;
-  if(!d||d.getElementById('chalkUpgrade'))return;
+  if(!d||!d.head||d.getElementById('chalkUpgrade'))return;
   const style=d.createElement('style');
   style.id='chalkUpgrade';
   style.textContent=`
@@ -55,7 +56,9 @@ frame.addEventListener('load',()=>{
   const start=new Date(new Date().getFullYear(),0,0),day=Math.floor((new Date()-start)/86400000),pair=words[day%words.length];
   const ww=d.getElementById('wordOfDayWord'),wd=d.getElementById('wordOfDayDef');if(ww)ww.textContent=pair[0];if(wd)wd.textContent=pair[1];
   const dash=d.getElementById('dashboardView');if(dash&&!dash.querySelector('.bottom-chalk')){const foot=d.createElement('div');foot.className='bottom-chalk';foot.textContent='“A better tomorrow starts in this room.”';dash.appendChild(foot)}
-});
+}
+frame.addEventListener('load',applyChalkUpgrade);
+setTimeout(applyChalkUpgrade,1200);
 </script>
 </body>
 </html>
