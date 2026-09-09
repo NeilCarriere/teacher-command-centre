@@ -10,16 +10,14 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=notes-export-20260909-1158" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=student-management-20260909-1205" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
   const d=shell.contentDocument;
-  if(!d||!d.body||d.getElementById('notesExportLoader'))return;
-  const s=d.createElement('script');
-  s.id='notesExportLoader';
-  s.src='notes-export.js?v=20260909-1158';
-  d.body.appendChild(s);
+  if(!d||!d.body||d.getElementById('extrasLoader'))return;
+  const marker=d.createElement('div');marker.id='extrasLoader';marker.hidden=true;d.body.appendChild(marker);
+  ['notes-export.js?v=20260909-1158','roster-delete.js?v=20260909-1205'].forEach(src=>{const s=d.createElement('script');s.src=src;d.body.appendChild(s)});
 }
 shell.addEventListener('load',()=>setTimeout(loadExtras,300));
 setTimeout(loadExtras,1200);
