@@ -10,46 +10,22 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=management-fix-20260909-1225" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=semester-tools-20260909-1245" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
   const coreDoc=shell.contentDocument;
   if(!coreDoc||!coreDoc.body||coreDoc.getElementById('extrasLoader'))return;
   const marker=coreDoc.createElement('div');marker.id='extrasLoader';marker.hidden=true;coreDoc.body.appendChild(marker);
-
-  // Bridge the legacy app's top-level variables onto its window object so
-  // modular add-ons can safely read/update the live roster and state.
   const app=coreDoc.getElementById('app');
   const installBridge=()=>{
     const legacyDoc=app?.contentDocument;
     if(!legacyDoc||!legacyDoc.body||legacyDoc.getElementById('teacherApiBridge'))return false;
-    const bridge=legacyDoc.createElement('script');
-    bridge.id='teacherApiBridge';
-    bridge.textContent=`
-      window.ROSTERS=ROSTERS;
-      window.state=state;
-      window.KEY=KEY;
-      window.esc=esc;
-      window.renderAll=renderAll;
-      window.absences=absences;
-      window.saveTeacherState=function(){localStorage.setItem(KEY,JSON.stringify(state));renderAll();};
-      Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;}});
-    `;
-    legacyDoc.body.appendChild(bridge);
-    return true;
+    const bridge=legacyDoc.createElement('script');bridge.id='teacherApiBridge';bridge.textContent=`window.ROSTERS=ROSTERS;window.state=state;window.KEY=KEY;window.esc=esc;window.renderAll=renderAll;window.absences=absences;window.saveTeacherState=function(){localStorage.setItem(KEY,JSON.stringify(state));renderAll();};Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;}});`;legacyDoc.body.appendChild(bridge);return true;
   };
-
-  let attempts=0;
-  const timer=setInterval(()=>{
-    if(installBridge()||++attempts>30){
-      clearInterval(timer);
-      ['notes-export.js?v=20260909-1225','roster-delete.js?v=20260909-1225','reminders.js?v=20260909-1214'].forEach(src=>{const s=coreDoc.createElement('script');s.src=src;coreDoc.body.appendChild(s)});
-    }
-  },150);
+  let attempts=0;const timer=setInterval(()=>{if(installBridge()||++attempts>30){clearInterval(timer);['notes-export.js?v=20260909-1245','roster-delete.js?v=20260909-1245','reminders.js?v=20260909-1214','v1-controls.js?v=20260909-1245'].forEach(src=>{const s=coreDoc.createElement('script');s.src=src;coreDoc.body.appendChild(s)})}},150);
 }
-shell.addEventListener('load',()=>setTimeout(loadExtras,300));
-setTimeout(loadExtras,1200);
+shell.addEventListener('load',()=>setTimeout(loadExtras,300));setTimeout(loadExtras,1200);
 </script>
 </body>
 </html>
