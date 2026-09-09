@@ -2,11 +2,21 @@
   const frame=document.getElementById('app');
   if(!frame)return;
   const NON_SCHOOL_KEY='neil_teacher_non_school_days_v1';
+  const BOARD_NON_SCHOOL_DATES=[
+    '2026-09-01','2026-09-07','2026-10-12','2026-10-26','2026-11-27',
+    '2026-12-21','2026-12-22','2026-12-23','2026-12-24','2026-12-25','2026-12-28','2026-12-29','2026-12-30','2026-12-31',
+    '2027-01-01','2027-01-29','2027-02-15',
+    '2027-03-15','2027-03-16','2027-03-17','2027-03-18','2027-03-19','2027-03-26','2027-03-29',
+    '2027-04-23','2027-05-24','2027-05-28','2027-06-28'
+  ];
 
   function localDate(y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
   function selectedClass(d,w){return d.getElementById('attendanceClassSelect')?.value||w.currentClass||''}
   function save(w){localStorage.setItem(w.KEY||'neil_teacher_dashboard_v1',JSON.stringify(w.state));}
-  function nonSchoolDates(){try{const x=JSON.parse(localStorage.getItem(NON_SCHOOL_KEY));return new Set(Array.isArray(x)?x:[])}catch(e){return new Set()}}
+  function nonSchoolDates(){
+    let custom=[];try{const x=JSON.parse(localStorage.getItem(NON_SCHOOL_KEY));if(Array.isArray(x))custom=x}catch(e){}
+    return new Set([...BOARD_NON_SCHOOL_DATES,...custom]);
+  }
   function isWeekend(date){const [y,m,d]=date.split('-').map(Number),day=new Date(y,m-1,d).getDay();return day===0||day===6}
   function isNonSchool(date){return isWeekend(date)||nonSchoolDates().has(date)}
   function currentStatus(w,cls,student,date){const rec=w.state?.students?.[cls]?.[student];const item=(rec?.attendance||[]).find(x=>x.date===date);return item?.status||''}
@@ -43,7 +53,6 @@
       const newStatus=b.dataset.gridStatus;
       if(setStatus(w,cls,student,date,newStatus))paintCell(cell,newStatus);
       closePicker(d);
-      // Refresh the daily editor and alerts, then restore grid hooks.
       if(typeof w.renderAll==='function')w.renderAll();
       setTimeout(enhanceGrid,40);
     });
@@ -58,7 +67,7 @@
     headerCells.forEach((th,i)=>{
       const date=localDate(year,mon,i+1),off=isNonSchool(date);
       th.classList.toggle('attendance-nonschool-header',off);
-      th.title=off?(isWeekend(date)?'Weekend — no attendance':'Non-school day — no attendance'):'';
+      th.title=off?(isWeekend(date)?'Weekend — no attendance':'CDSBEO non-school day — no attendance'):'';
     });
     const rows=overview.querySelectorAll('tbody tr');
     rows.forEach(row=>{
@@ -70,7 +79,7 @@
         cell.dataset.nonSchool=off?'1':'0';
         cell.classList.toggle('attendance-grid-editable',!off);
         cell.classList.toggle('attendance-nonschool',off);
-        if(off){cell.textContent='';cell.removeAttribute('data-status');cell.title=isWeekend(date)?'Weekend — no attendance':'Non-school day — no attendance'}
+        if(off){cell.textContent='';cell.removeAttribute('data-status');cell.title=isWeekend(date)?'Weekend — no attendance':'CDSBEO non-school day — no attendance'}
         else{const status=currentStatus(w,cls,student,date);paintCell(cell,status);cell.title='Click to mark Absent, Excused, Late, or clear to Present'}
       });
     });
@@ -92,7 +101,7 @@
     `;d.head.appendChild(s)}
     const overview=d.getElementById('attendanceMonthOverview');if(!overview)return false;
     let note=d.getElementById('attendanceGridInstruction');if(!note){note=d.createElement('div');note.id='attendanceGridInstruction';note.className='attendance-grid-instruction';overview.insertAdjacentElement('beforebegin',note)}
-    note.innerHTML='<strong>Quick entry:</strong> click a school-day cell and choose A, E, or L. P / Clear returns it to assumed Present. Weekends are blocked; school holidays will be blocked when your calendar is added.';
+    note.innerHTML='<strong>Quick entry:</strong> click a school-day cell and choose A, E, or L. P / Clear returns it to assumed Present. Weekends, holidays, breaks, and PA days from the CDSBEO 2026–27 calendar are blocked.';
     if(d.body.dataset.attendanceGridEntryV2!=='1'){
       d.body.dataset.attendanceGridEntryV2='1';
       d.addEventListener('click',e=>{
