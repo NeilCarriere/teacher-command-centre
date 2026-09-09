@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=cdsbeo-calendar-20260909-1545" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=attendance-month-only-20260909-1616" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -27,16 +27,16 @@ function loadExtras(){
   let attempts=0;const timer=setInterval(()=>{
     if(installBridge()||++attempts>30){
       clearInterval(timer);
-      addScript('v1-controls.js?v=20260909-1545',()=>{
-        addScript('notes-export.js?v=20260909-1545');
-        addScript('roster-delete.js?v=20260909-1545');
-        addScript('reminders.js?v=20260909-1545');
-        addScript('navigation-fix.js?v=20260909-1545',()=>{
-          addScript('student-sort.js?v=20260909-1545',()=>{
-            addScript('attendance-ui-fix.js?v=20260909-1545',()=>{
-              addScript('attendance-grid-entry.js?v=20260909-1545',()=>{
-                addScript('assignment-edit.js?v=20260909-1545',()=>{
-                  addScript('assignment-calendar.js?v=20260909-1545');
+      addScript('v1-controls.js?v=20260909-1616',()=>{
+        addScript('notes-export.js?v=20260909-1616');
+        addScript('roster-delete.js?v=20260909-1616');
+        addScript('reminders.js?v=20260909-1616');
+        addScript('navigation-fix.js?v=20260909-1616',()=>{
+          addScript('student-sort.js?v=20260909-1616',()=>{
+            addScript('attendance-ui-fix.js?v=20260909-1616',()=>{
+              addScript('attendance-grid-entry.js?v=20260909-1616',()=>{
+                addScript('assignment-edit.js?v=20260909-1616',()=>{
+                  addScript('assignment-calendar.js?v=20260909-1616');
                 });
               });
             });
