@@ -10,11 +10,10 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<!-- Chalkboard redesign v2: direct GitHub Pages entry point -->
-<iframe id="app" src="legacy.html?v=chalkboard-20260909-1124" title="Teacher Command Centre"></iframe>
+<iframe id="app" src="legacy.html?v=attendance-history-20260909-1141" title="Teacher Command Centre"></iframe>
 <script>
 const frame=document.getElementById('app');
-function applyChalkUpgrade(){
+function applyUpgrade(){
   const d=frame.contentDocument;
   if(!d||!d.head||d.getElementById('chalkUpgrade'))return;
   const style=d.createElement('style');
@@ -24,22 +23,22 @@ function applyChalkUpgrade(){
   .chalk-title,.panel h2,.panel h3,.class-card h3,.history-title{font-family:"Segoe Print","Comic Sans MS","Trebuchet MS",cursive;letter-spacing:.2px;text-shadow:.8px .4px 0 rgba(255,255,255,.18),-.6px -.3px 0 rgba(0,0,0,.2),1.3px -.5px 0 rgba(255,255,255,.07)}
   .chalk-title{background:radial-gradient(circle at 30% 35%,rgba(255,255,255,.98) 0 .7px,rgba(243,240,223,.93) .9px 2px,rgba(225,225,211,.72) 2.2px 3px);background-size:4px 4px;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:.25px rgba(255,255,255,.35)}
   body:before{background-image:radial-gradient(circle,rgba(255,255,255,.13) .55px,transparent .8px),linear-gradient(90deg,transparent 0 49%,rgba(255,255,255,.015) 50%,transparent 51%),linear-gradient(0deg,transparent 0 49%,rgba(255,255,255,.012) 50%,transparent 51%);background-size:5px 5px,9px 9px,9px 9px}
-  .brand{font-size:24px}.brand small{font-size:13px}.main{padding:20px 24px 36px;min-width:0;overflow:hidden}
-  .command-strip{display:grid;grid-template-columns:minmax(300px,1.3fr) minmax(210px,.78fr) minmax(220px,.85fr);gap:16px;align-items:stretch;margin-bottom:18px}
-  .command-card{position:relative;min-height:134px;padding:16px 18px;border:1.5px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(9,35,30,.42);box-shadow:0 8px 24px rgba(0,0,0,.25);overflow:hidden}
+  .brand{font-size:24px}.brand small{font-size:13px}.main{padding:18px 22px 34px;min-width:0;overflow:hidden}
+  .command-strip{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(210px,.7fr) minmax(220px,.75fr);gap:14px;align-items:stretch;margin-bottom:14px}
+  .command-card{position:relative;min-height:112px;padding:13px 16px;border:1.5px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(9,35,30,.42);box-shadow:0 8px 24px rgba(0,0,0,.25);overflow:hidden}
   .command-card:after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background:radial-gradient(circle,rgba(255,255,255,.42) .45px,transparent .75px);background-size:6px 6px}
-  .welcome h1{font-size:28px;line-height:1.05;margin:0 0 7px}.welcome p{margin:0;color:var(--muted);font-size:14px}
-  .mug-quote{display:flex;align-items:center;gap:12px;margin-top:13px}.mug{font-size:42px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.24))}
+  .welcome{display:flex;align-items:center}.mug-quote{display:flex;align-items:center;gap:12px;margin:0}.mug{font-size:40px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.24))}
   .mug-copy{font-family:"Segoe Print","Comic Sans MS",cursive;font-size:15px;line-height:1.25;color:#e9efe9}.mug-copy strong{display:block;color:var(--yellow);font-size:12px;margin-top:3px;font-family:"Trebuchet MS",sans-serif}
-  .sticky{background:linear-gradient(145deg,#ffe77d,#f5cf56);color:#1f241f;border-radius:2px 3px 8px 2px;transform:rotate(-1.3deg);box-shadow:0 8px 16px rgba(0,0,0,.28);padding:18px 16px 14px;min-height:134px;position:relative;font-family:"Segoe Print","Comic Sans MS",cursive}
+  .sticky{background:linear-gradient(145deg,#ffe77d,#f5cf56);color:#1f241f;border-radius:2px 3px 8px 2px;transform:rotate(-1.1deg);box-shadow:0 8px 16px rgba(0,0,0,.28);padding:16px 15px 12px;min-height:112px;position:relative;font-family:"Segoe Print","Comic Sans MS",cursive}
   .sticky:before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#d84838;top:-8px;left:50%;transform:translateX(-50%);box-shadow:0 3px 3px rgba(0,0,0,.35),inset -3px -3px 4px rgba(0,0,0,.18)}
-  .sticky .label{font-weight:900;font-size:15px;border-bottom:2px solid rgba(195,70,55,.65);display:inline-block;margin-bottom:8px}.sticky .word{font-size:21px;font-weight:900;line-height:1.15}.sticky .def{font-size:13px;line-height:1.35;margin-top:6px}
-  .date-doodle{display:flex;flex-direction:column;justify-content:space-between}.datebox{text-align:left;color:#dbe7df;font-size:15px}.date-icon{font-size:33px;margin-bottom:7px}.mini-quote{font-family:"Segoe Print","Comic Sans MS",cursive;color:#e7eee9;font-size:15px;line-height:1.3}.doodle-line{height:3px;margin-top:8px;background:linear-gradient(90deg,var(--blue),var(--green),transparent);border-radius:99px;opacity:.7}
-  .class-card:after{content:"✦";position:absolute;right:14px;bottom:8px;color:var(--accent);font-size:25px;opacity:.16;transform:rotate(12deg)}
+  .sticky .label{font-weight:900;font-size:14px;border-bottom:2px solid rgba(195,70,55,.65);display:inline-block;margin-bottom:6px}.sticky .word{font-size:19px;font-weight:900;line-height:1.1}.sticky .def{font-size:12px;line-height:1.3;margin-top:5px}
+  .date-doodle{display:flex;flex-direction:column;justify-content:space-between}.datebox{text-align:left;color:#dbe7df;font-size:14px}.date-icon{font-size:28px;margin-bottom:4px}.mini-quote{font-family:"Segoe Print","Comic Sans MS",cursive;color:#e7eee9;font-size:13px;line-height:1.25}.doodle-line{height:3px;margin-top:6px;background:linear-gradient(90deg,var(--blue),var(--green),transparent);border-radius:99px;opacity:.7}
+  .cards{gap:12px!important;margin-bottom:14px!important}.class-card{min-height:118px!important;padding:14px!important}.class-card h3{font-size:20px!important;line-height:1.12!important;margin-bottom:5px!important}.class-card p{margin:0 0 10px!important;font-size:13px!important}.card-actions{gap:6px!important}.mini-btn{padding:6px 8px!important;font-size:12px!important}.class-card:after{content:"✦";position:absolute;right:12px;bottom:7px;color:var(--accent);font-size:22px;opacity:.14;transform:rotate(12deg)}
   .panel h2:after,.panel h3:after{content:"";display:block;width:88px;height:2px;margin-top:5px;background:linear-gradient(90deg,currentColor,transparent);opacity:.35}
   .bottom-chalk{text-align:center;margin-top:8px;padding:8px 0 0;font-family:"Segoe Print","Comic Sans MS",cursive;color:#d9e4dc;opacity:.84;font-size:16px}
-  @media(max-width:1050px){.command-strip{grid-template-columns:1fr 1fr}.welcome{grid-column:1/-1}}
-  @media(max-width:700px){.command-strip{grid-template-columns:1fr}.welcome{grid-column:auto}.welcome h1{font-size:24px}.sticky{transform:none}.mug{font-size:36px}}
+  .attendance-shell{display:grid;gap:14px}.attendance-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.attendance-controls input,.attendance-controls select{min-width:160px}.attendance-day-title{font-family:"Segoe Print","Comic Sans MS",cursive;font-size:24px;margin:0}.month-overview{overflow:auto;max-height:360px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.month-overview table{font-size:12px;min-width:900px}.month-overview th,.month-overview td{text-align:center;padding:6px 5px;white-space:nowrap}.month-overview th:first-child,.month-overview td:first-child{position:sticky;left:0;background:#17332e;text-align:left;z-index:2}.month-cell{cursor:pointer;border-radius:5px}.month-cell:hover{background:rgba(255,255,255,.08)}.month-cell[data-status="A"]{color:var(--red);font-weight:900}.month-cell[data-status="E"]{color:var(--yellow);font-weight:900}.month-cell[data-status="L"]{color:var(--blue);font-weight:900}.month-cell[data-status="P"]{color:var(--green);font-weight:900}.attendance-edit{overflow:auto}.attendance-edit table{min-width:620px}.attendance-edit .status-btn{padding:5px 7px}.history-help{color:var(--muted);font-size:12px;margin-top:-4px}
+  @media(max-width:1050px){.command-strip{grid-template-columns:1fr 1fr}.welcome{grid-column:1/-1}.class-card{min-height:105px!important}}
+  @media(max-width:700px){.command-strip{grid-template-columns:1fr}.welcome{grid-column:auto}.sticky{transform:none}.mug{font-size:34px}.class-card{min-height:auto!important}.attendance-controls>*{width:100%}}
   `;
   d.head.appendChild(style);
   const brand=d.querySelector('.brand');
@@ -48,7 +47,7 @@ function applyChalkUpgrade(){
   const old=d.querySelector('#dashboardView .topbar');
   if(old){
     const strip=d.createElement('div');strip.className='command-strip';
-    strip.innerHTML=`<div class="command-card welcome"><h1 class="chalk-title">Teacher Command Centre</h1><p>Plan • Teach • Track • Breathe</p><div class="mug-quote"><div class="mug">☕</div><div class="mug-copy">“Teaching is the art of making a difference every day.”<strong>— one cup at a time</strong></div></div></div><div class="sticky"><div class="label">Word of the Day</div><div class="word" id="wordOfDayWord">Resilience</div><div class="def" id="wordOfDayDef">The ability to recover quickly from difficulties.</div></div><div class="command-card date-doodle"><div><div class="date-icon">📅</div><div class="datebox" id="todayFancy"></div></div><div><div class="mini-quote">“Small steps make a big difference.” ✦</div><div class="doodle-line"></div></div></div>`;
+    strip.innerHTML=`<div class="command-card welcome"><div class="mug-quote"><div class="mug">☕</div><div class="mug-copy">“Teaching is the art of making a difference every day.”<strong>— one cup at a time</strong></div></div></div><div class="sticky"><div class="label">Word of the Day</div><div class="word" id="wordOfDayWord">Resilience</div><div class="def" id="wordOfDayDef">The ability to recover quickly from difficulties.</div></div><div class="command-card date-doodle"><div><div class="date-icon">📅</div><div class="datebox" id="todayFancy"></div></div><div><div class="mini-quote">“Small steps make a big difference.” ✦</div><div class="doodle-line"></div></div></div>`;
     old.replaceWith(strip);
   }
   const date=d.getElementById('todayFancy');if(date)date.textContent=new Date().toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
@@ -56,9 +55,46 @@ function applyChalkUpgrade(){
   const start=new Date(new Date().getFullYear(),0,0),day=Math.floor((new Date()-start)/86400000),pair=words[day%words.length];
   const ww=d.getElementById('wordOfDayWord'),wd=d.getElementById('wordOfDayDef');if(ww)ww.textContent=pair[0];if(wd)wd.textContent=pair[1];
   const dash=d.getElementById('dashboardView');if(dash&&!dash.querySelector('.bottom-chalk')){const foot=d.createElement('div');foot.className='bottom-chalk';foot.textContent='“A better tomorrow starts in this room.”';dash.appendChild(foot)}
+
+  const attendanceSection=d.createElement('section');
+  attendanceSection.id='attendanceHistoryView';
+  attendanceSection.className='hidden';
+  attendanceSection.innerHTML=`<div class="panel attendance-shell"><div><h2 class="attendance-day-title">Attendance History</h2><div class="history-help">Choose a class and date to review or correct attendance. Changes save immediately on this device.</div></div><div class="attendance-controls"><button class="secondary" id="attendanceBackBtn">← Back to Dashboard</button><select id="attendanceClassSelect"></select><input type="month" id="attendanceMonth"><input type="date" id="attendanceDate"><button class="secondary" id="attendanceTodayBtn">Today</button></div><div><h3>Month at a Glance</h3><div class="month-overview" id="attendanceMonthOverview"></div></div><div><h3 id="attendanceEditTitle">Edit Selected Day</h3><div class="attendance-edit table-wrap"><table id="attendanceEditTable"></table></div></div></div>`;
+  d.querySelector('main.main').appendChild(attendanceSection);
+  const nav=d.querySelector('.nav');
+  if(nav){const b=d.createElement('button');b.id='attendanceHistoryNav';b.textContent='🗓 Attendance History';nav.insertBefore(b,d.getElementById('resetBtn'))}
+  const script=d.createElement('script');
+  script.textContent=`
+  (function(){
+    const historyView=document.getElementById('attendanceHistoryView');
+    const clsSel=document.getElementById('attendanceClassSelect');
+    const monthInput=document.getElementById('attendanceMonth');
+    const dateInput=document.getElementById('attendanceDate');
+    clsSel.innerHTML=Object.keys(ROSTERS).map(c=>'<option>'+esc(c)+'</option>').join('');
+    const now=new Date(),pad=n=>String(n).padStart(2,'0');
+    const localISO=x=>x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate());
+    dateInput.value=localISO(now);monthInput.value=localISO(now).slice(0,7);
+    function showOnly(id){['dashboardView','homeworkView','reportsView','attendanceHistoryView'].forEach(x=>document.getElementById(x)?.classList.toggle('hidden',x!==id));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(id==='attendanceHistoryView')document.getElementById('attendanceHistoryNav')?.classList.add('active');else document.querySelector('.nav button[data-view="dashboard"]')?.classList.add('active')}
+    function getRecord(name){return state.students[clsSel.value][name]}
+    function statusOn(rec,date){return rec.attendance.find(x=>x.date===date)?.status||''}
+    function setStatus(name,date,status){const rec=getRecord(name),before=absences(rec),idx=rec.attendance.findIndex(x=>x.date===date);if(status===''){if(idx>=0)rec.attendance.splice(idx,1)}else if(idx>=0)rec.attendance[idx].status=status;else rec.attendance.push({date,status});const after=absences(rec);state.currentClass=clsSel.value;currentClass=clsSel.value;localStorage.setItem(KEY,JSON.stringify(state));renderAll();renderAttendanceHistory();if(typeof thresholdReached==='function'&&typeof showThresholdAlert==='function'){const reached=thresholdReached(before,after);if(reached)showThresholdAlert(name,reached)}}
+    function renderMonth(){const [y,m]=monthInput.value.split('-').map(Number),days=new Date(y,m,0).getDate(),names=ROSTERS[clsSel.value];let html='<table><thead><tr><th>Student</th>';for(let day=1;day<=days;day++)html+='<th>'+day+'</th>';html+='</tr></thead><tbody>';for(const name of names){html+='<tr><td><strong>'+esc(name)+'</strong></td>';for(let day=1;day<=days;day++){const ds=y+'-'+pad(m)+'-'+pad(day),st=statusOn(getRecord(name),ds);html+='<td class="month-cell" data-date="'+ds+'" data-status="'+st+'" title="'+ds+'">'+(st||'·')+'</td>'}html+='</tr>'}html+='</tbody></table>';document.getElementById('attendanceMonthOverview').innerHTML=html;document.querySelectorAll('.month-cell').forEach(cell=>cell.onclick=()=>{dateInput.value=cell.dataset.date;renderEdit()})}
+    function renderEdit(){const date=dateInput.value||localISO(now),names=ROSTERS[clsSel.value],pretty=new Date(date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});document.getElementById('attendanceEditTitle').textContent='Edit '+pretty;let rows=names.map((name,i)=>{const st=statusOn(getRecord(name),date);return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(name)+'</strong></td><td><div class="statuses">'+['P','A','E','L'].map(s=>'<button class="status-btn '+(st===s?'active':'')+'" data-hist-student="'+esc(name)+'" data-hist-status="'+s+'">'+s+'</button>').join('')+'<button class="status-btn" data-hist-student="'+esc(name)+'" data-hist-status="">Clear</button></div></td></tr>'}).join('');document.getElementById('attendanceEditTable').innerHTML='<thead><tr><th>#</th><th>Student</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody>';document.querySelectorAll('[data-hist-student]').forEach(b=>b.onclick=()=>setStatus(b.dataset.histStudent,date,b.dataset.histStatus))}
+    function renderAttendanceHistory(){renderMonth();renderEdit()}
+    window.openAttendanceHistory=function(cls){if(cls&&ROSTERS[cls])clsSel.value=cls;currentClass=clsSel.value;state.currentClass=currentClass;monthInput.value=(dateInput.value||localISO(now)).slice(0,7);showOnly('attendanceHistoryView');renderAttendanceHistory()}
+    clsSel.onchange=()=>{currentClass=clsSel.value;state.currentClass=currentClass;renderAttendanceHistory()};
+    monthInput.onchange=()=>{if(monthInput.value){dateInput.value=monthInput.value+'-01'}renderAttendanceHistory()};
+    dateInput.onchange=()=>{if(dateInput.value)monthInput.value=dateInput.value.slice(0,7);renderAttendanceHistory()};
+    document.getElementById('attendanceTodayBtn').onclick=()=>{dateInput.value=localISO(new Date());monthInput.value=dateInput.value.slice(0,7);renderAttendanceHistory()};
+    document.getElementById('attendanceBackBtn').onclick=()=>showOnly('dashboardView');
+    document.getElementById('attendanceHistoryNav').onclick=()=>openAttendanceHistory(currentClass);
+    document.addEventListener('click',e=>{const b=e.target.closest('.class-card .mini-btn');if(b&&b.textContent.trim()==='Attendance'){e.preventDefault();e.stopImmediatePropagation();openAttendanceHistory(b.dataset.open)}},true);
+    const take=document.getElementById('takeAttendanceBtn');if(take){const historyBtn=document.createElement('button');historyBtn.className='secondary';historyBtn.textContent='View / Edit Past Attendance';historyBtn.onclick=()=>openAttendanceHistory(currentClass);take.parentElement.appendChild(historyBtn)}
+  })();`;
+  d.body.appendChild(script);
 }
-frame.addEventListener('load',applyChalkUpgrade);
-setTimeout(applyChalkUpgrade,1200);
+frame.addEventListener('load',applyUpgrade);
+setTimeout(applyUpgrade,1200);
 </script>
 </body>
 </html>
