@@ -12,6 +12,16 @@
       if((b.dataset.view||'')==='class'||/^👥?\s*Class(es)?$/i.test(txt)) b.remove();
     });
 
+    // Several enhancement modules can provide Notes. Keep exactly one
+    // working Notes button in the sidebar and discard any duplicates.
+    const noteButtons=[...d.querySelectorAll('.nav button')].filter(b=>
+      b.id==='notesCentreNav'||/^🗒?\s*Notes$/i.test(b.textContent.trim())
+    );
+    if(noteButtons.length>1){
+      const preferred=noteButtons.find(b=>b.id==='notesCentreNav')||noteButtons[0];
+      noteButtons.forEach(b=>{if(b!==preferred)b.remove()});
+    }
+
     // The sidebar has more tools now than it did in the original prototype.
     // Make it independently scrollable so Manage Courses / Winston / etc.
     // can never be clipped below the bottom of the screen.
