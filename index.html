@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=semester-tools-20260909-1245" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=winston-fix-20260909-1220" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -23,7 +23,19 @@ function loadExtras(){
     if(!legacyDoc||!legacyDoc.body||legacyDoc.getElementById('teacherApiBridge'))return false;
     const bridge=legacyDoc.createElement('script');bridge.id='teacherApiBridge';bridge.textContent=`window.ROSTERS=ROSTERS;window.state=state;window.KEY=KEY;window.esc=esc;window.renderAll=renderAll;window.absences=absences;window.saveTeacherState=function(){localStorage.setItem(KEY,JSON.stringify(state));renderAll();};Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;}});`;legacyDoc.body.appendChild(bridge);return true;
   };
-  let attempts=0;const timer=setInterval(()=>{if(installBridge()||++attempts>30){clearInterval(timer);['notes-export.js?v=20260909-1245','roster-delete.js?v=20260909-1245','reminders.js?v=20260909-1214','v1-controls.js?v=20260909-1245'].forEach(src=>{const s=coreDoc.createElement('script');s.src=src;coreDoc.body.appendChild(s)})}},150);
+  function addScript(src,onload){const s=coreDoc.createElement('script');s.src=src;if(onload)s.onload=onload;coreDoc.body.appendChild(s)}
+  let attempts=0;const timer=setInterval(()=>{
+    if(installBridge()||++attempts>30){
+      clearInterval(timer);
+      // Load the core semester controls first. Notes/export depends on the
+      // navigation bridge that those controls expose.
+      addScript('v1-controls.js?v=20260909-1220',()=>{
+        addScript('notes-export.js?v=20260909-1220');
+        addScript('roster-delete.js?v=20260909-1220');
+        addScript('reminders.js?v=20260909-1220');
+      });
+    }
+  },150);
 }
 shell.addEventListener('load',()=>setTimeout(loadExtras,300));setTimeout(loadExtras,1200);
 </script>
