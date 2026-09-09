@@ -2,6 +2,23 @@
   const frame=document.getElementById('app');
   if(!frame)return;
 
+  function normalizedText(el){return (el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase()}
+
+  function dedupeButtons(scope,selector,preferredIds=[]){
+    const groups=new Map();
+    scope.querySelectorAll(selector).forEach(btn=>{
+      const key=normalizedText(btn);
+      if(!key)return;
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(btn);
+    });
+    groups.forEach(buttons=>{
+      if(buttons.length<2)return;
+      const preferred=buttons.find(b=>preferredIds.includes(b.id))||buttons[0];
+      buttons.forEach(b=>{if(b!==preferred)b.remove()});
+    });
+  }
+
   function apply(){
     const d=frame.contentDocument;
     if(!d||!d.head||!d.body)return false;
@@ -12,24 +29,25 @@
       if((b.dataset.view||'')==='class'||/^👥?\s*Class(es)?$/i.test(txt)) b.remove();
     });
 
-    // Enhancement modules can overlap. Keep exactly one Notes button.
-    const noteButtons=[...d.querySelectorAll('.nav button')].filter(b=>
-      b.id==='notesCentreNav'||/^🗒?\s*Notes$/i.test(b.textContent.trim())
-    );
-    if(noteButtons.length>1){
-      const preferred=noteButtons.find(b=>b.id==='notesCentreNav')||noteButtons[0];
-      noteButtons.forEach(b=>{if(b!==preferred)b.remove()});
+    // Sidebar tools should never appear twice. Prefer the canonical modern IDs.
+    const nav=d.querySelector('.nav');
+    if(nav){
+      dedupeButtons(nav,'button',[
+        'notesCentreNav','winstonExportNav','studentManagerNav','courseManagerNav',
+        'attendanceHistoryNav','assignmentTrackerNav','resetBtn'
+      ]);
     }
 
-    // Same protection for Export to Winston: keep one working button even
-    // if more than one module attempted to add it while we were debugging.
-    const winstonButtons=[...d.querySelectorAll('.nav button')].filter(b=>
-      b.id==='winstonExportNav'||/Export\s+to\s+Winston/i.test(b.textContent.trim())
-    );
-    if(winstonButtons.length>1){
-      const preferred=winstonButtons.find(b=>b.id==='winstonExportNav')||winstonButtons[0];
-      winstonButtons.forEach(b=>{if(b!==preferred)b.remove()});
-    }
+    // Assignment actions should be unique within each assignment card.
+    d.querySelectorAll('#assignmentList .assignment-card').forEach(card=>{
+      dedupeButtons(card,'.assignment-actions button, .v1-delete-assignment, .delete-assignment-btn');
+    });
+
+    // Class-card quick actions should also be unique within each class card.
+    d.querySelectorAll('.class-card').forEach(card=>{
+      const actions=card.querySelector('.card-actions');
+      if(actions)dedupeButtons(actions,'button');
+    });
 
     // The sidebar has more tools now than it did in the original prototype.
     // Make it independently scrollable so Manage Courses / Winston / etc.
@@ -48,7 +66,6 @@
     }
 
     // Put the administrative tools together in a predictable order.
-    const nav=d.querySelector('.nav');
     if(nav){
       const reset=d.getElementById('resetBtn');
       const exportBtn=d.getElementById('winstonExportNav');
@@ -66,4 +83,21 @@
     apply();
     if(++tries>40)clearInterval(timer);
   },250);
+
+  // Keep watching briefly for late-loading enhancement modules and clean up
+  // accidental duplicates as soon as they appear.
+  function installObserver(){
+    const d=frame.contentDocument;
+    if(!d||!d.body)return false;
+    if(d.getElementById('redundancyCleanupObserver'))return true;
+    const marker=d.createElement('div');marker.id='redundancyCleanupObserver';marker.hidden=true;d.body.appendChild(marker);
+    let queued=false;
+    new MutationObserver(()=>{
+      if(queued)return;queued=true;
+      setTimeout(()=>{queued=false;apply()},50);
+    }).observe(d.body,{childList:true,subtree:true});
+    return true;
+  }
+  let observerTries=0;
+  const observerTimer=setInterval(()=>{if(installObserver()||++observerTries>40)clearInterval(observerTimer)},250);
 })();
