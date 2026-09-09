@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=winston-fix-20260909-1220" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=sidebar-fix-20260909-1230" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -27,12 +27,11 @@ function loadExtras(){
   let attempts=0;const timer=setInterval(()=>{
     if(installBridge()||++attempts>30){
       clearInterval(timer);
-      // Load the core semester controls first. Notes/export depends on the
-      // navigation bridge that those controls expose.
-      addScript('v1-controls.js?v=20260909-1220',()=>{
-        addScript('notes-export.js?v=20260909-1220');
-        addScript('roster-delete.js?v=20260909-1220');
-        addScript('reminders.js?v=20260909-1220');
+      addScript('v1-controls.js?v=20260909-1230',()=>{
+        addScript('notes-export.js?v=20260909-1230');
+        addScript('roster-delete.js?v=20260909-1230');
+        addScript('reminders.js?v=20260909-1230');
+        addScript('navigation-fix.js?v=20260909-1230');
       });
     }
   },150);
