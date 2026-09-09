@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=attendance-months-20260909-1435" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=assignment-edit-20260909-1445" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -27,13 +27,15 @@ function loadExtras(){
   let attempts=0;const timer=setInterval(()=>{
     if(installBridge()||++attempts>30){
       clearInterval(timer);
-      addScript('v1-controls.js?v=20260909-1435',()=>{
-        addScript('notes-export.js?v=20260909-1435');
-        addScript('roster-delete.js?v=20260909-1435');
-        addScript('reminders.js?v=20260909-1435');
-        addScript('navigation-fix.js?v=20260909-1435',()=>{
-          addScript('student-sort.js?v=20260909-1435',()=>{
-            addScript('attendance-ui-fix.js?v=20260909-1435');
+      addScript('v1-controls.js?v=20260909-1445',()=>{
+        addScript('notes-export.js?v=20260909-1445');
+        addScript('roster-delete.js?v=20260909-1445');
+        addScript('reminders.js?v=20260909-1445');
+        addScript('navigation-fix.js?v=20260909-1445',()=>{
+          addScript('student-sort.js?v=20260909-1445',()=>{
+            addScript('attendance-ui-fix.js?v=20260909-1445',()=>{
+              addScript('assignment-edit.js?v=20260909-1445');
+            });
           });
         });
       });
