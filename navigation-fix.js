@@ -9,26 +9,48 @@
     groups.forEach(buttons=>{if(buttons.length<2)return;const preferred=buttons.find(b=>preferredIds.includes(b.id))||buttons[0];buttons.forEach(b=>{if(b!==preferred)b.remove()})});
   }
 
+  function installButtonFeedback(){
+    const d=frame.contentDocument;
+    if(!d||!d.head)return false;
+    if(!d.getElementById('buttonFeedbackStyles')){
+      const style=d.createElement('style');style.id='buttonFeedbackStyles';style.textContent=`
+        button{transition:transform .08s ease,box-shadow .12s ease,background-color .12s ease,border-color .12s ease,filter .12s ease}
+        button:active,.button-pressed{transform:translateY(2px) scale(.97)!important;filter:brightness(1.25);box-shadow:inset 0 3px 7px rgba(0,0,0,.38),0 0 0 2px rgba(255,255,255,.12)!important}
+        button:focus-visible{outline:3px solid rgba(246,211,101,.72)!important;outline-offset:2px}
+        .status-btn.active{font-weight:900!important;color:#071b17!important;transform:translateY(1px);box-shadow:inset 0 3px 6px rgba(0,0,0,.28),0 0 0 2px rgba(255,255,255,.18)!important}
+        .status-btn.active[data-status="P"]{background:var(--green)!important;border-color:var(--green)!important;outline:2px solid #bff7d0!important}
+        .status-btn.active[data-status="A"]{background:var(--red)!important;border-color:var(--red)!important;outline:2px solid #ffc2c2!important}
+        .status-btn.active[data-status="E"]{background:var(--yellow)!important;border-color:var(--yellow)!important;outline:2px solid #fff0a8!important}
+        .status-btn.active[data-status="L"]{background:var(--blue)!important;border-color:var(--blue)!important;outline:2px solid #c8e7ff!important}
+        .level-btn.active{background:var(--green)!important;color:#071b17!important;font-weight:900!important;box-shadow:inset 0 2px 5px rgba(0,0,0,.3),0 0 0 2px rgba(255,255,255,.15)!important}
+        .assignment-tab.active,.nav button.active{box-shadow:inset 0 2px 5px rgba(0,0,0,.28),0 0 0 2px rgba(99,214,139,.18)!important}
+      `;d.head.appendChild(style);
+    }
+    if(d.body.dataset.buttonFeedback!=='1'){
+      d.body.dataset.buttonFeedback='1';
+      d.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(b)b.classList.add('button-pressed')},true);
+      const release=e=>{const b=e.target.closest?.('button');if(b)setTimeout(()=>b.classList.remove('button-pressed'),90)};
+      d.addEventListener('pointerup',release,true);d.addEventListener('pointercancel',release,true);d.addEventListener('pointerleave',release,true);
+    }
+    return true;
+  }
+
   function installAttendanceRepair(){
     const d=frame.contentDocument,w=frame.contentWindow;
     if(!d||!d.body||!w||d.body.dataset.attendanceRepair==='1')return false;
     d.body.dataset.attendanceRepair='1';
-    // Delegated handler makes the main P/A/E/L buttons reliable even after
-    // other modules redraw the student table. History buttons keep their own handler.
     d.addEventListener('click',e=>{
       const b=e.target.closest('.status-btn[data-student][data-status]');
       if(!b)return;
       e.preventDefault();e.stopImmediatePropagation();
       try{
         const cls=w.currentClass,student=b.dataset.student,status=b.dataset.status;
-        const rec=w.state?.students?.[cls]?.[student];
-        if(!rec)return;
+        const rec=w.state?.students?.[cls]?.[student];if(!rec)return;
         const now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000),date=local.toISOString().slice(0,10);
         if(!Array.isArray(rec.attendance))rec.attendance=[];
         const idx=rec.attendance.findIndex(x=>x.date===date);
         if(idx>=0)rec.attendance[idx].status=status;else rec.attendance.push({date,status});
-        w.state.currentClass=cls;
-        localStorage.setItem(w.KEY||'neil_teacher_dashboard_v1',JSON.stringify(w.state));
+        w.state.currentClass=cls;localStorage.setItem(w.KEY||'neil_teacher_dashboard_v1',JSON.stringify(w.state));
         if(typeof w.renderAll==='function')w.renderAll();
       }catch(err){console.error('Attendance save failed',err)}
     },true);
@@ -44,7 +66,7 @@
     d.querySelectorAll('.class-card').forEach(card=>{const actions=card.querySelector('.card-actions');if(actions)dedupeButtons(actions,'button')});
     if(!d.getElementById('sidebarNavigationFix')){const style=d.createElement('style');style.id='sidebarNavigationFix';style.textContent=`.sidebar{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;padding-bottom:18px!important}.sidebar .nav{padding-bottom:8px}.sidebar .nav button{padding:9px 11px!important;margin:2px 0!important}.sidebar .quote{position:static!important;display:block!important;margin:12px 8px 8px!important;left:auto!important;right:auto!important;bottom:auto!important;font-size:12px!important}@media(max-width:1050px){.sidebar{overflow:visible}.sidebar .quote{display:none!important}}`;d.head.appendChild(style)}
     if(nav){const reset=d.getElementById('resetBtn'),exportBtn=d.getElementById('winstonExportNav'),students=d.getElementById('studentManagerNav'),courses=d.getElementById('courseManagerNav');[exportBtn,students,courses].forEach(btn=>{if(btn&&btn.nextElementSibling!==reset)nav.insertBefore(btn,reset)})}
-    installAttendanceRepair();
+    installButtonFeedback();installAttendanceRepair();
     return !!d.getElementById('courseManagerNav');
   }
 
