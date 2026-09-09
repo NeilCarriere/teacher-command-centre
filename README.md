@@ -1,2 +1,2 @@
-# teacher-command-centre
+index.html
 My teacher command centre
