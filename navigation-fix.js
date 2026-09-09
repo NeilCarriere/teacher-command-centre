@@ -12,14 +12,23 @@
       if((b.dataset.view||'')==='class'||/^👥?\s*Class(es)?$/i.test(txt)) b.remove();
     });
 
-    // Several enhancement modules can provide Notes. Keep exactly one
-    // working Notes button in the sidebar and discard any duplicates.
+    // Enhancement modules can overlap. Keep exactly one Notes button.
     const noteButtons=[...d.querySelectorAll('.nav button')].filter(b=>
       b.id==='notesCentreNav'||/^🗒?\s*Notes$/i.test(b.textContent.trim())
     );
     if(noteButtons.length>1){
       const preferred=noteButtons.find(b=>b.id==='notesCentreNav')||noteButtons[0];
       noteButtons.forEach(b=>{if(b!==preferred)b.remove()});
+    }
+
+    // Same protection for Export to Winston: keep one working button even
+    // if more than one module attempted to add it while we were debugging.
+    const winstonButtons=[...d.querySelectorAll('.nav button')].filter(b=>
+      b.id==='winstonExportNav'||/Export\s+to\s+Winston/i.test(b.textContent.trim())
+    );
+    if(winstonButtons.length>1){
+      const preferred=winstonButtons.find(b=>b.id==='winstonExportNav')||winstonButtons[0];
+      winstonButtons.forEach(b=>{if(b!==preferred)b.remove()});
     }
 
     // The sidebar has more tools now than it did in the original prototype.
