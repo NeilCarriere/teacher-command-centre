@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=button-feedback-20260909-1310" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=attendance-scroll-20260909-1315" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -27,11 +27,11 @@ function loadExtras(){
   let attempts=0;const timer=setInterval(()=>{
     if(installBridge()||++attempts>30){
       clearInterval(timer);
-      addScript('v1-controls.js?v=20260909-1310',()=>{
-        addScript('notes-export.js?v=20260909-1310');
-        addScript('roster-delete.js?v=20260909-1310');
-        addScript('reminders.js?v=20260909-1310');
-        addScript('navigation-fix.js?v=20260909-1310');
+      addScript('v1-controls.js?v=20260909-1315',()=>{
+        addScript('notes-export.js?v=20260909-1315');
+        addScript('roster-delete.js?v=20260909-1315');
+        addScript('reminders.js?v=20260909-1315');
+        addScript('navigation-fix.js?v=20260909-1315');
       });
     }
   },150);
