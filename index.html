@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=reminder-labels-20260909-1622" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=persistence-fix-20260910" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -21,22 +21,93 @@ function loadExtras(){
   const installBridge=()=>{
     const legacyDoc=app?.contentDocument;
     if(!legacyDoc||!legacyDoc.body||legacyDoc.getElementById('teacherApiBridge'))return false;
-    const bridge=legacyDoc.createElement('script');bridge.id='teacherApiBridge';bridge.textContent=`window.ROSTERS=ROSTERS;window.state=state;window.KEY=KEY;window.esc=esc;window.renderAll=renderAll;window.absences=absences;window.saveTeacherState=function(){localStorage.setItem(KEY,JSON.stringify(state));renderAll();};Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;}});`;legacyDoc.body.appendChild(bridge);return true;
+    const bridge=legacyDoc.createElement('script');
+    bridge.id='teacherApiBridge';
+    bridge.textContent=`
+      window.ROSTERS=ROSTERS;
+      window.KEY=KEY;
+      window.esc=esc;
+      window.renderAll=renderAll;
+      window.absences=absences;
+
+      const PERSIST_KEY='neil_teacher_dashboard_v2';
+
+      function rebuildState(saved){
+        const fresh=blankState();
+        if(!saved||!saved.students)return fresh;
+        Object.keys(fresh.students).forEach(function(c){
+          Object.keys(fresh.students[c]).forEach(function(n){
+            if(saved.students&&saved.students[c]&&saved.students[c][n]){
+              fresh.students[c][n]=saved.students[c][n];
+            }
+          });
+        });
+        fresh.currentClass=saved.currentClass||fresh.currentClass;
+        fresh.assignments=Array.isArray(saved.assignments)?saved.assignments:[];
+        Object.keys(saved).forEach(function(k){
+          if(k!=='students'&&k!=='currentClass'&&k!=='assignments')fresh[k]=saved[k];
+        });
+        return fresh;
+      }
+
+      function readBestSavedState(){
+        const candidates=[PERSIST_KEY,KEY];
+        for(const k of candidates){
+          try{
+            const raw=localStorage.getItem(k);
+            if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.students)return parsed;}
+          }catch(e){}
+        }
+        return null;
+      }
+
+      const recovered=readBestSavedState();
+      if(recovered){
+        state=rebuildState(recovered);
+        currentClass=state.currentClass||currentClass||'Civics';
+      }
+
+      function persistTeacherState(){
+        try{
+          state.currentClass=currentClass;
+          const json=JSON.stringify(state);
+          localStorage.setItem(KEY,json);
+          localStorage.setItem(PERSIST_KEY,json);
+          try{window.parent.localStorage.setItem(PERSIST_KEY,json);}catch(e){}
+          try{window.top.localStorage.setItem(PERSIST_KEY,json);}catch(e){}
+          return true;
+        }catch(e){
+          console.error('Teacher dashboard save failed',e);
+          return false;
+        }
+      }
+
+      save=function(){persistTeacherState();renderAll();};
+      window.saveTeacherState=function(){persistTeacherState();renderAll();};
+      window.state=state;
+      Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;persistTeacherState();}});
+      window.addEventListener('pagehide',persistTeacherState);
+      window.addEventListener('beforeunload',persistTeacherState);
+      document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')persistTeacherState();});
+      persistTeacherState();
+      renderAll();
+    `;
+    legacyDoc.body.appendChild(bridge);return true;
   };
   function addScript(src,onload){const s=coreDoc.createElement('script');s.src=src;if(onload)s.onload=onload;coreDoc.body.appendChild(s)}
   let attempts=0;const timer=setInterval(()=>{
     if(installBridge()||++attempts>30){
       clearInterval(timer);
-      addScript('v1-controls.js?v=20260909-1622',()=>{
-        addScript('notes-export.js?v=20260909-1622');
-        addScript('roster-delete.js?v=20260909-1622');
-        addScript('reminders.js?v=20260909-1622');
-        addScript('navigation-fix.js?v=20260909-1622',()=>{
-          addScript('student-sort.js?v=20260909-1622',()=>{
-            addScript('attendance-ui-fix.js?v=20260909-1622',()=>{
-              addScript('attendance-grid-entry.js?v=20260909-1622',()=>{
-                addScript('assignment-edit.js?v=20260909-1622',()=>{
-                  addScript('assignment-calendar.js?v=20260909-1622');
+      addScript('v1-controls.js?v=20260910-persist',()=>{
+        addScript('notes-export.js?v=20260910-persist');
+        addScript('roster-delete.js?v=20260910-persist');
+        addScript('reminders.js?v=20260910-persist');
+        addScript('navigation-fix.js?v=20260910-persist',()=>{
+          addScript('student-sort.js?v=20260910-persist',()=>{
+            addScript('attendance-ui-fix.js?v=20260910-persist',()=>{
+              addScript('attendance-grid-entry.js?v=20260910-persist',()=>{
+                addScript('assignment-edit.js?v=20260910-persist',()=>{
+                  addScript('assignment-calendar.js?v=20260910-persist');
                 });
               });
             });
