@@ -31,6 +31,8 @@
       .export-card h3{margin-top:0}.export-card p{color:var(--muted);font-size:13px;line-height:1.45}.export-card button{margin-top:6px}
       .export-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.export-stat{padding:10px;border:1px solid rgba(255,255,255,.12);border-radius:9px;text-align:center}.export-stat strong{display:block;font-size:22px}
       .privacy-note{padding:12px;border-left:3px solid var(--yellow);background:rgba(246,211,101,.05);font-size:12px;line-height:1.45}
+      .winston-status{margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid rgba(99,214,139,.45);background:rgba(99,214,139,.08);font-size:13px;line-height:1.4}
+      .winston-status.warn{border-color:rgba(246,211,101,.45);background:rgba(246,211,101,.07)}
       @media(max-width:900px){.notes-form{grid-template-columns:1fr 1fr}.export-grid{grid-template-columns:1fr}.export-summary{grid-template-columns:1fr 1fr}}
       @media(max-width:650px){.notes-form{grid-template-columns:1fr}.notes-form textarea,.notes-actions{grid-column:auto}.note-card{grid-template-columns:1fr}.notes-filters>*{width:100%}}
     `;
@@ -44,17 +46,16 @@
 
     const exportSection=d.createElement('section');
     exportSection.id='winstonExportView';exportSection.className='hidden';
-    exportSection.innerHTML=`<div class="panel export-shell"><div class="export-top"><div><h2 class="export-heading">Export to Winston</h2><div class="history-help">Create a file you can upload to ChatGPT when you want deeper calculations, summaries, or grade analysis.</div></div><button class="secondary" id="exportBackBtn">← Back to Dashboard</button></div><div class="export-summary" id="exportSummary"></div><div class="export-grid"><div class="export-card"><h3>Winston Data Export</h3><p>Exports attendance, participation, notes, missing work, and the Assignment Tracker data as one JSON file. This is the best format to upload here for analysis.</p><button class="primary" id="downloadWinstonJson">Download Winston Export (.json)</button></div><div class="export-card"><h3>Readable Gradebook CSV</h3><p>Creates a spreadsheet-friendly CSV of assignment marks and submission status. Useful for a quick backup or opening in Excel/Sheets.</p><button class="secondary" id="downloadGradeCsv">Download Assignment CSV</button></div></div><div class="privacy-note"><strong>Privacy:</strong> these files contain identifiable student information. Keep them on an approved device and only upload/share them where your school or board permits.</div></div>`;
+    exportSection.innerHTML=`<div class="panel export-shell"><div class="export-top"><div><h2 class="export-heading">Send to Winston</h2><div class="history-help">Copy your current teacher data, then paste it directly into this ChatGPT conversation.</div></div><button class="secondary" id="exportBackBtn">← Back to Dashboard</button></div><div class="export-summary" id="exportSummary"></div><div class="export-grid"><div class="export-card"><h3>Send Current Teacher Data</h3><p>Copies attendance, participation, notes, missing work, roster changes, and Assignment Tracker data to your clipboard. Then return to ChatGPT, paste, and send.</p><button class="primary" id="downloadWinstonJson">↗ Send to Winston</button><div id="winstonSendStatus" class="winston-status" style="display:none"></div></div><div class="export-card"><h3>Readable Gradebook CSV</h3><p>Creates a spreadsheet-friendly CSV of assignment marks and submission status. Useful for a quick backup or opening in Excel/Sheets.</p><button class="secondary" id="downloadGradeCsv">Download Assignment CSV</button></div></div><div class="privacy-note"><strong>Privacy:</strong> this data contains identifiable student information. Only paste/share it where your school or board permits.</div></div>`;
     main.appendChild(exportSection);
 
     const nav=d.querySelector('.nav');
     if(nav){
       const reset=d.getElementById('resetBtn');
       const n=d.createElement('button');n.id='notesCentreNav';n.textContent='🗒 Notes';nav.insertBefore(n,reset);
-      const x=d.createElement('button');x.id='winstonExportNav';x.textContent='⬇ Export to Winston';nav.insertBefore(x,reset);
+      const x=d.createElement('button');x.id='winstonExportNav';x.textContent='↗ Send to Winston';nav.insertBefore(x,reset);
     }
 
-    const categories=['Participation','Academic','Behaviour','Attendance Follow-up','Parent Contact','Accommodation/Support','General'];
     const pad=n=>String(n).padStart(2,'0'),iso=x=>x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate());
     let editRef=null;
     const notesClass=d.getElementById('notesClass'),notesStudent=d.getElementById('notesStudent'),notesCategory=d.getElementById('notesCategory'),notesDate=d.getElementById('notesDate'),notesText=d.getElementById('notesText');
@@ -76,7 +77,7 @@
     function refreshDashboardNotes(){const box=d.getElementById('recentNotes');if(!box)return;normalizeNotes();const rows=allNotes().filter(x=>x.cls===(w.currentClass||x.cls)).slice(0,5);box.innerHTML='<div class="recent-notes-tools"><span class="small">Latest observations</span><button class="secondary" id="openAllNotes">View / Add Notes</button></div>'+(rows.length?rows.map(x=>'<div class="alert-item recent-note-link" data-recent-note="'+x.n.id+'"><span><strong>'+w.esc(x.student)+'</strong> <span class="note-category">'+w.esc(x.n.category||'General')+'</span><br><span class="small">'+w.esc(x.n.text)+'</span></span><span class="small">'+w.esc(x.n.date||'')+'</span></div>').join(''):'<div class="small">No notes yet.</div>');d.getElementById('openAllNotes').onclick=()=>openNotes(w.currentClass);box.querySelectorAll('[data-recent-note]').forEach(el=>el.onclick=()=>{openNotes(w.currentClass);beginEdit(el.dataset.recentNote)})}
 
     function showOnly(id){['dashboardView','homeworkView','reportsView','attendanceHistoryView','assignmentTrackerView','notesCentreView','winstonExportView'].forEach(x=>d.getElementById(x)?.classList.toggle('hidden',x!==id));d.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));const map={notesCentreView:'notesCentreNav',winstonExportView:'winstonExportNav',attendanceHistoryView:'attendanceHistoryNav',assignmentTrackerView:'assignmentTrackerNav'};if(map[id])d.getElementById(map[id])?.classList.add('active');else d.querySelector('.nav button[data-view="dashboard"]')?.classList.add('active')}
-    const priorShow=w.teacherShowOnly;w.teacherShowOnly=function(id){showOnly(id)};
+    w.teacherShowOnly=function(id){showOnly(id)};
     function openNotes(cls){if(cls&&w.ROSTERS[cls]){notesClass.value=cls;filterClass.value=cls;fillStudents(notesStudent,cls);fillStudents(filterStudent,cls,true)}showOnly('notesCentreView');renderNotesCentre()}
     w.openNotesCentre=openNotes;
 
@@ -88,10 +89,22 @@
     d.addEventListener('click',e=>{const b=e.target.closest('.class-card .mini-btn');if(b&&b.textContent.trim()==='Participation'){/* leave participation button unchanged */}const add=e.target.closest('#addNoteBtn');if(add){e.preventDefault();e.stopImmediatePropagation();openNotes(w.currentClass)}},true);
 
     function assignmentData(){try{return JSON.parse(localStorage.getItem('neil_teacher_assignments_v1'))||{}}catch(e){return{}}}
-    function buildExport(){normalizeNotes();return{format:'teacher-command-centre-winston-export',version:1,exportedAt:new Date().toISOString(),teacherApp:{currentClass:w.currentClass,studentData:w.state},assignmentTracker:assignmentData()}}
+    function buildExport(){normalizeNotes();return{format:'teacher-command-centre-winston-export',version:7,exportedAt:new Date().toISOString(),teacherApp:{currentClass:w.currentClass,studentData:w.state},assignmentTracker:assignmentData()}}
     function download(name,type,text){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=d.createElement('a');a.href=url;a.download=name;d.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
     function renderExportSummary(){const notes=allNotes().length;let attendance=0;Object.values(w.state.students).forEach(ss=>Object.values(ss).forEach(r=>attendance+=(r.attendance||[]).length));const a=assignmentData();let assignments=0,marks=0;Object.values(a.classes||{}).forEach(c=>(c.assignments||[]).forEach(x=>{assignments++;Object.values(x.students||{}).forEach(s=>{if(String(s.mark??'').trim()!=='')marks++})}));d.getElementById('exportSummary').innerHTML='<div class="export-stat"><strong>'+attendance+'</strong><span class="small">attendance records</span></div><div class="export-stat"><strong>'+notes+'</strong><span class="small">notes</span></div><div class="export-stat"><strong>'+assignments+'</strong><span class="small">assignments</span></div><div class="export-stat"><strong>'+marks+'</strong><span class="small">marks entered</span></div>'}
-    d.getElementById('downloadWinstonJson').onclick=()=>download('teacher-command-centre-winston-'+iso(new Date())+'.json','application/json',JSON.stringify(buildExport(),null,2));
+    function setWinstonStatus(message,warn=false){const box=d.getElementById('winstonSendStatus');box.style.display='block';box.classList.toggle('warn',warn);box.textContent=message}
+    async function copyWinstonData(){
+      const btn=d.getElementById('downloadWinstonJson');
+      const text=JSON.stringify(buildExport(),null,2);
+      btn.disabled=true;btn.textContent='Preparing…';
+      let copied=false;
+      try{await navigator.clipboard.writeText(text);copied=true}catch(err){
+        try{const ta=d.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';d.body.appendChild(ta);ta.select();copied=d.execCommand('copy');ta.remove()}catch(_){copied=false}
+      }
+      if(copied){btn.textContent='✓ Copied — paste in ChatGPT';setWinstonStatus('Ready. Return to this ChatGPT conversation, press Ctrl+V, and send. Winston will reply “Yeah I got it.”')}else{btn.textContent='Copy blocked';setWinstonStatus('Your browser blocked clipboard access. Try this dashboard in Chrome or Edge, or use the newest downloaded Winston export as a fallback.',true)}
+      btn.disabled=false;
+    }
+    d.getElementById('downloadWinstonJson').onclick=copyWinstonData;
     d.getElementById('downloadGradeCsv').onclick=()=>{const data=assignmentData(),rows=[['Class','Assignment','Assigned','Due','Out Of','Student','Handed In','Mark']];Object.entries(data.classes||{}).forEach(([cls,c])=>(c.assignments||[]).forEach(a=>Object.entries(a.students||{}).forEach(([student,r])=>rows.push([cls,a.name,a.assigned||'',a.due||'',a.maxMark||100,student,r.submitted?'Yes':'No',r.mark??'']))));const csv=rows.map(row=>row.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\n');download('teacher-command-centre-assignments-'+iso(new Date())+'.csv','text/csv;charset=utf-8',csv)};
 
     normalizeNotes();renderNotesCentre();refreshDashboardNotes();
