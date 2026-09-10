@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=winston-share-20260910" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=winston-direct-v3-20260910" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -24,11 +24,7 @@ function loadExtras(){
     const bridge=legacyDoc.createElement('script');
     bridge.id='teacherApiBridge';
     bridge.textContent=`
-      window.ROSTERS=ROSTERS;
-      window.KEY=KEY;
-      window.esc=esc;
-      window.renderAll=renderAll;
-      window.absences=absences;
+      window.ROSTERS=ROSTERS;window.KEY=KEY;window.esc=esc;window.renderAll=renderAll;window.absences=absences;
       const PERSIST_KEY='neil_teacher_dashboard_v2';
       function rebuildState(saved){const fresh=blankState();if(!saved||!saved.students)return fresh;Object.keys(fresh.students).forEach(function(c){Object.keys(fresh.students[c]).forEach(function(n){if(saved.students&&saved.students[c]&&saved.students[c][n])fresh.students[c][n]=saved.students[c][n];});});fresh.currentClass=saved.currentClass||fresh.currentClass;fresh.assignments=Array.isArray(saved.assignments)?saved.assignments:[];Object.keys(saved).forEach(function(k){if(k!=='students'&&k!=='currentClass'&&k!=='assignments')fresh[k]=saved[k];});return fresh;}
       function readBestSavedState(){for(const k of [PERSIST_KEY,KEY]){try{const raw=localStorage.getItem(k);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.students)return parsed;}}catch(e){}}return null;}
@@ -37,13 +33,10 @@ function loadExtras(){
       save=function(){persistTeacherState();renderAll();};window.saveTeacherState=function(){const ok=persistTeacherState();renderAll();return ok;};window.state=state;Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;persistTeacherState();}});
       if(!document.getElementById('manualSaveBtn')){const nav=document.querySelector('.nav');if(nav){const btn=document.createElement('button');btn.id='manualSaveBtn';btn.type='button';btn.textContent='💾 Save Now';btn.title='Manually save all dashboard information on this device';btn.onclick=function(){const ok=persistTeacherState();const original='💾 Save Now';btn.textContent=ok?'✓ Saved':'⚠ Save failed';btn.style.borderColor=ok?'#63d68b':'#ff6b6b';setTimeout(function(){btn.textContent=original;btn.style.borderColor='';},1800);};const reset=document.getElementById('resetBtn');if(reset)nav.insertBefore(btn,reset);else nav.appendChild(btn);}}
       window.addEventListener('pagehide',persistTeacherState);window.addEventListener('beforeunload',persistTeacherState);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')persistTeacherState();});persistTeacherState();renderAll();
-    `;
-    legacyDoc.body.appendChild(bridge);return true;
+    `;legacyDoc.body.appendChild(bridge);return true;
   };
   function addScript(src,onload){const s=coreDoc.createElement('script');s.src=src;if(onload)s.onload=onload;coreDoc.body.appendChild(s)}
-  let attempts=0;const timer=setInterval(()=>{
-    if(installBridge()||++attempts>30){clearInterval(timer);addScript('v1-controls.js?v=20260910-manual-save',()=>{addScript('notes-export.js?v=20260910-manual-save');addScript('roster-delete.js?v=20260910-manual-save');addScript('reminders.js?v=20260910-manual-save');addScript('navigation-fix.js?v=20260910-manual-save',()=>{addScript('student-sort.js?v=20260910-manual-save',()=>{addScript('attendance-ui-fix.js?v=20260910-full-roster',()=>{addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{addScript('assignment-edit.js?v=20260910-manual-save',()=>{addScript('assignment-calendar.js?v=20260910-manual-save');addScript('today-canada.js?v=20260910-headline-refresh-2');addScript('export-nav-fix.js?v=20260910-export-fix');addScript('history-refresh.js?v=20260910-canadian-history');addScript('winston-share.js?v=20260910-share-v2');});});});});});});}
-  },150);
+  let attempts=0;const timer=setInterval(()=>{if(installBridge()||++attempts>30){clearInterval(timer);addScript('v1-controls.js?v=20260910-manual-save',()=>{addScript('notes-export.js?v=20260910-manual-save',()=>{addScript('winston-share.js?v=20260910-direct-v3')});addScript('roster-delete.js?v=20260910-manual-save');addScript('reminders.js?v=20260910-manual-save');addScript('navigation-fix.js?v=20260910-manual-save',()=>{addScript('student-sort.js?v=20260910-manual-save',()=>{addScript('attendance-ui-fix.js?v=20260910-full-roster',()=>{addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{addScript('assignment-edit.js?v=20260910-manual-save',()=>{addScript('assignment-calendar.js?v=20260910-manual-save');addScript('today-canada.js?v=20260910-headline-refresh-2');addScript('export-nav-fix.js?v=20260910-export-fix');addScript('history-refresh.js?v=20260910-canadian-history');});});});});});});}},150);
 }
 shell.addEventListener('load',()=>setTimeout(loadExtras,300));setTimeout(loadExtras,1200);
 </script>
