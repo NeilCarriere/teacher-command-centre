@@ -49,7 +49,9 @@ function loadExtras(){
             addScript('attendance-ui-fix.js?v=20260910-full-roster',()=>{
               addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{
                 addScript('assignment-edit.js?v=20260910-manual-save',()=>{
-                  addScript('assignment-calendar.js?v=20260910-calendar-v2');
+                  addScript('assignment-calendar.js?v=20260910-calendar-v2',()=>{
+                    addScript('assignment-levels.js?v=20260910-rubric-levels-v1');
+                  });
                   addScript('alert-details.js?v=20260910-alert-details-v1');
                   addScript('today-canada.js?v=20260910-headline-refresh-2');
                   addScript('history-refresh.js?v=20260910-canadian-history');
