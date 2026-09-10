@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=winston-source-v7-20260910" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=winston-v8-20260910" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -40,7 +40,9 @@ function loadExtras(){
     if(installBridge()||++attempts>30){
       clearInterval(timer);
       addScript('v1-controls.js?v=20260910-manual-save',()=>{
-        addScript('notes-export.js?v=20260910-source-v7');
+        addScript('notes-export.js?v=20260910-source-v7',()=>{
+          addScript('winston-send-v8.js?v=20260910-v8');
+        });
         addScript('roster-delete.js?v=20260910-manual-save');
         addScript('reminders.js?v=20260910-manual-save');
         addScript('navigation-fix.js?v=20260910-manual-save',()=>{
@@ -50,7 +52,6 @@ function loadExtras(){
                 addScript('assignment-edit.js?v=20260910-manual-save',()=>{
                   addScript('assignment-calendar.js?v=20260910-manual-save');
                   addScript('today-canada.js?v=20260910-headline-refresh-2');
-                  addScript('export-nav-fix.js?v=20260910-export-fix');
                   addScript('history-refresh.js?v=20260910-canadian-history');
                 });
               });
