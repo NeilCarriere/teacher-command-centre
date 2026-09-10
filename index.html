@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=canada-headline-refresh-20260910" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=winston-share-20260910" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -42,7 +42,7 @@ function loadExtras(){
   };
   function addScript(src,onload){const s=coreDoc.createElement('script');s.src=src;if(onload)s.onload=onload;coreDoc.body.appendChild(s)}
   let attempts=0;const timer=setInterval(()=>{
-    if(installBridge()||++attempts>30){clearInterval(timer);addScript('v1-controls.js?v=20260910-manual-save',()=>{addScript('notes-export.js?v=20260910-manual-save');addScript('roster-delete.js?v=20260910-manual-save');addScript('reminders.js?v=20260910-manual-save');addScript('navigation-fix.js?v=20260910-manual-save',()=>{addScript('student-sort.js?v=20260910-manual-save',()=>{addScript('attendance-ui-fix.js?v=20260910-attendance-cleanup',()=>{addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{addScript('assignment-edit.js?v=20260910-manual-save',()=>{addScript('assignment-calendar.js?v=20260910-manual-save');addScript('today-canada.js?v=20260910-headline-refresh-2');addScript('export-nav-fix.js?v=20260910-export-fix');addScript('history-refresh.js?v=20260910-canadian-history');});});});});});});}
+    if(installBridge()||++attempts>30){clearInterval(timer);addScript('v1-controls.js?v=20260910-manual-save',()=>{addScript('notes-export.js?v=20260910-manual-save');addScript('roster-delete.js?v=20260910-manual-save');addScript('reminders.js?v=20260910-manual-save');addScript('navigation-fix.js?v=20260910-manual-save',()=>{addScript('student-sort.js?v=20260910-manual-save',()=>{addScript('attendance-ui-fix.js?v=20260910-full-roster',()=>{addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{addScript('assignment-edit.js?v=20260910-manual-save',()=>{addScript('assignment-calendar.js?v=20260910-manual-save');addScript('today-canada.js?v=20260910-headline-refresh-2');addScript('export-nav-fix.js?v=20260910-export-fix');addScript('history-refresh.js?v=20260910-canadian-history');addScript('winston-share.js?v=20260910-share-v2');});});});});});});}
   },150);
 }
 shell.addEventListener('load',()=>setTimeout(loadExtras,300));setTimeout(loadExtras,1200);
