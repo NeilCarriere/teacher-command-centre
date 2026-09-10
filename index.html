@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=manual-save-20260910" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=today-canada-20260910" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -130,6 +130,7 @@ function loadExtras(){
               addScript('attendance-grid-entry.js?v=20260910-manual-save',()=>{
                 addScript('assignment-edit.js?v=20260910-manual-save',()=>{
                   addScript('assignment-calendar.js?v=20260910-manual-save');
+                  addScript('today-canada.js?v=20260910-canada-news');
                 });
               });
             });
