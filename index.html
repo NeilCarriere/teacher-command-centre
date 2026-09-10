@@ -10,7 +10,7 @@ html,body{margin:0;width:100%;height:100%;background:#3e2919;overflow:hidden}ifr
 </style>
 </head>
 <body>
-<iframe id="shell" src="core.html?v=winston-v8-20260910" title="Teacher Command Centre"></iframe>
+<iframe id="shell" src="core.html?v=winston-v10-20260910" allow="clipboard-write" title="Teacher Command Centre"></iframe>
 <script>
 const shell=document.getElementById('shell');
 function loadExtras(){
@@ -18,6 +18,7 @@ function loadExtras(){
   if(!coreDoc||!coreDoc.body||coreDoc.getElementById('extrasLoader'))return;
   const marker=coreDoc.createElement('div');marker.id='extrasLoader';marker.hidden=true;coreDoc.body.appendChild(marker);
   const app=coreDoc.getElementById('app');
+  if(app)app.setAttribute('allow','clipboard-write');
   const installBridge=()=>{
     const legacyDoc=app?.contentDocument;
     if(!legacyDoc||!legacyDoc.body||legacyDoc.getElementById('teacherApiBridge'))return false;
@@ -41,7 +42,7 @@ function loadExtras(){
       clearInterval(timer);
       addScript('v1-controls.js?v=20260910-manual-save',()=>{
         addScript('notes-export.js?v=20260910-source-v7',()=>{
-          addScript('winston-send-v8.js?v=20260910-v8');
+          addScript('winston-send-v8.js?v=20260910-v10');
         });
         addScript('roster-delete.js?v=20260910-manual-save');
         addScript('reminders.js?v=20260910-manual-save');
