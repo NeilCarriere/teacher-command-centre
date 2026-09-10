@@ -5,6 +5,7 @@
 
   function read(w){try{return JSON.parse(w.localStorage.getItem(ASSIGN_KEY))||{classes:{}}}catch(e){return{classes:{}}}}
   function write(w,data){w.localStorage.setItem(ASSIGN_KEY,JSON.stringify(data))}
+  function setText(el,value){if(el&&el.textContent!==value)el.textContent=value}
   function activeClass(d,w){return d.querySelector('.assignment-tab.active')?.dataset.assignmentClass||w.currentClass||''}
   function findAssignment(d,w,data){
     const cls=activeClass(d,w),detail=d.getElementById('assignmentDetail');
@@ -40,7 +41,7 @@
     if(!na){
       na=d.createElement('input');na.type='checkbox';na.dataset.notRequiredStudent=student;na.title='Absent — assignment not required';na.setAttribute('aria-label','Absent, assignment not required for '+student);cell.appendChild(na);
     }
-    na.checked=!!r.notRequired;
+    if(na.checked!==!!r.notRequired)na.checked=!!r.notRequired;
     return na;
   }
 
@@ -55,26 +56,26 @@
       const na=ensureNotRequiredColumn(d,row,r,student);
       const exempt=!!r.notRequired;
       if(exempt)notRequired++;else if(!r.submitted)outstanding++;
-      cb.checked=!exempt&&!!r.submitted;
-      cb.disabled=exempt;
+      const shouldCheck=!exempt&&!!r.submitted;if(cb.checked!==shouldCheck)cb.checked=shouldCheck;
+      if(cb.disabled!==exempt)cb.disabled=exempt;
       row.classList.toggle('submitted-row',!exempt&&!!r.submitted);
       row.classList.toggle('missing-row',!exempt&&!r.submitted);
       row.classList.toggle('not-required-row',exempt);
-      const status=row.querySelector('td:last-child');if(status)status.textContent=exempt?'Not Required — Absent':(r.submitted?'Handed in':'Outstanding');
-      const sel=row.querySelector('.assignment-level-select');if(sel){const v=String(r.achievement??r.mark??'');if([...sel.options].some(o=>o.value===v))sel.value=v;else sel.value='';sel.disabled=exempt;}
-      na.onchange=()=>{
-        const fresh=read(w),f=findAssignment(d,w,fresh),fa=f.a;if(!fa)return;
-        if(!fa.students)fa.students={};
-        const fr=fa.students[student]||(fa.students[student]={submitted:false,mark:'',achievement:'',note:''});
-        if(na.checked){
-          fr.notRequired=true;fr.notRequiredReason='Absent';fr.submitted=true;fr.achievement='';fr.mark='';
-        }else{
-          fr.notRequired=false;delete fr.notRequiredReason;fr.submitted=false;
-        }
-        fa.grading='levels';write(w,fresh);syncDetail(d,w);syncCards(d,w);
-      };
+      const status=row.querySelector('td:last-child');setText(status,exempt?'Not Required — Absent':(r.submitted?'Handed in':'Outstanding'));
+      const sel=row.querySelector('.assignment-level-select');if(sel){const v=String(r.achievement??r.mark??'');const wanted=[...sel.options].some(o=>o.value===v)?v:'';if(sel.value!==wanted)sel.value=wanted;if(sel.disabled!==exempt)sel.disabled=exempt;}
+      if(na.dataset.naWired!=='1'){
+        na.dataset.naWired='1';
+        na.addEventListener('change',()=>{
+          const fresh=read(w),f=findAssignment(d,w,fresh),fa=f.a;if(!fa)return;
+          if(!fa.students)fa.students={};
+          const fr=fa.students[student]||(fa.students[student]={submitted:false,mark:'',achievement:'',note:''});
+          if(na.checked){fr.notRequired=true;fr.notRequiredReason='Absent';fr.submitted=true;fr.achievement='';fr.mark='';}
+          else{fr.notRequired=false;delete fr.notRequiredReason;fr.submitted=false;}
+          fa.grading='levels';fa.maxMark=4;write(w,fresh);syncDetail(d,w);syncCards(d,w);
+        });
+      }
     });
-    const meta=detail.querySelector('.assignment-meta');if(meta)meta.textContent=outstanding+' students outstanding'+(notRequired?' · '+notRequired+' not required':'')+' · achievement levels R–4+';
+    setText(detail.querySelector('.assignment-meta'),outstanding+' students outstanding'+(notRequired?' · '+notRequired+' not required':'')+' · achievement levels R–4+');
   }
 
   function syncCards(d,w){
@@ -85,15 +86,15 @@
       const roster=w.ROSTERS?.[cls]||Object.keys(a.students||{});
       const outstanding=roster.filter(n=>!a.students?.[n]?.submitted&&!a.students?.[n]?.notRequired).length;
       const entered=roster.filter(n=>String(a.students?.[n]?.achievement??a.students?.[n]?.mark??'').trim()!=='').length;
-      const chips=card.querySelectorAll('.assignment-chip');if(chips[0])chips[0].textContent=outstanding+' not handed in';if(chips[1])chips[1].textContent=entered+' levels entered';
+      const chips=card.querySelectorAll('.assignment-chip');if(chips[0])setText(chips[0],outstanding+' not handed in');if(chips[1])setText(chips[1],entered+' levels entered');
     });
   }
 
   function install(){
     const d=frame.contentDocument,w=frame.contentWindow;if(!d||!w||!d.body||!w.ROSTERS)return false;
     ensureStyles(d);
-    if(d.body.dataset.assignmentPersistenceFix==='2'){syncCards(d,w);syncDetail(d,w);return true}
-    d.body.dataset.assignmentPersistenceFix='2';
+    if(d.body.dataset.assignmentPersistenceFix==='3'){syncCards(d,w);syncDetail(d,w);return true}
+    d.body.dataset.assignmentPersistenceFix='3';
 
     d.addEventListener('change',e=>{
       const cb=e.target.closest?.('[data-submit-student]');
@@ -112,11 +113,11 @@
       }else{
         const v=sel.value||'';r.achievement=v;r.mark=v;if(v){r.submitted=true;r.notRequired=false;delete r.notRequiredReason;}
       }
-      a.grading='levels';write(w,data);
+      a.grading='levels';a.maxMark=4;write(w,data);
       syncDetail(d,w);syncCards(d,w);
     },true);
 
-    let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;setTimeout(()=>{queued=false;syncCards(d,w);syncDetail(d,w)},50)}).observe(d.body,{childList:true,subtree:true});
+    let queued=false;new MutationObserver(records=>{if(queued)return;const meaningful=records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1));if(!meaningful)return;queued=true;setTimeout(()=>{queued=false;syncCards(d,w);syncDetail(d,w)},70)}).observe(d.body,{childList:true,subtree:true});
     syncCards(d,w);syncDetail(d,w);return true;
   }
 
