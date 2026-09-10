@@ -39,10 +39,31 @@
 
   function removeDailyEditor(d,overview){
     const view=d.getElementById('attendanceHistoryView');if(!view||!overview)return;
-    // Month at a Glance is now the sole attendance editor. Remove everything after its grid.
-    let node=overview.nextElementSibling;
-    while(node){const next=node.nextElementSibling;node.remove();node=next;}
-    // Hide any daily/date editing controls above the month grid while retaining class/month navigation.
+
+    // The monthly grid is now the only attendance editor. Completely hide the old
+    // selected-day editor (the heading plus P / A / E / L / Clear buttons).
+    const editTitle=d.getElementById('attendanceEditTitle');
+    if(editTitle){
+      const block=editTitle.parentElement;
+      if(block)block.style.display='none';
+      else editTitle.style.display='none';
+    }
+    const editTable=d.getElementById('attendanceEditTable');
+    if(editTable){
+      const block=editTable.closest('.attendance-edit')?.parentElement || editTable.parentElement;
+      if(block)block.style.display='none';
+      else editTable.style.display='none';
+    }
+
+    // Also suppress any remaining status buttons in that retired daily editor area,
+    // in case the legacy renderer rebuilds it after a class/date change.
+    view.querySelectorAll('.attendance-edit, #attendanceEditTable').forEach(el=>{
+      const block=el.classList?.contains('attendance-edit')?el.parentElement:el.closest('.attendance-edit')?.parentElement;
+      if(block)block.style.display='none';
+      else el.style.display='none';
+    });
+
+    // Hide obsolete single-day date controls; class and month navigation remain.
     const dateInput=d.getElementById('attendanceDate');
     if(dateInput){const wrapper=dateInput.closest('.field,.control,.input-group,label')||dateInput;wrapper.style.display='none'}
     [...view.querySelectorAll('button')].forEach(b=>{const t=(b.textContent||'').trim().toLowerCase();if(t==='today'&&b.closest('#attendanceHistoryView'))b.style.display='none'});
@@ -50,11 +71,12 @@
 
   function install(){
     const d=frame.contentDocument;if(!d||!d.head||!d.body)return false;
-    if(!d.getElementById('attendanceRosterScrollV4')){
-      const s=d.createElement('style');s.id='attendanceRosterScrollV4';s.textContent=`
+    if(!d.getElementById('attendanceRosterScrollV5')){
+      const s=d.createElement('style');s.id='attendanceRosterScrollV5';s.textContent=`
         #attendanceMonthOverview.month-overview{height:min(650px,68vh)!important;max-height:min(650px,68vh)!important;min-height:360px!important;overflow-x:auto!important;overflow-y:scroll!important;overscroll-behavior:contain!important;scrollbar-gutter:stable both-edges!important;-webkit-overflow-scrolling:touch!important;position:relative!important}
         #attendanceMonthOverview table{margin:0!important}#attendanceMonthOverview table thead th{position:sticky!important;top:0!important;background:#17332e!important;z-index:8!important;box-shadow:0 1px 0 rgba(255,255,255,.16)!important}
         #attendanceMonthOverview table thead th:first-child{left:0!important;z-index:10!important}#attendanceMonthOverview table tbody td:first-child{position:sticky!important;left:0!important;background:#17332e!important;z-index:6!important}
+        #attendanceHistoryView #attendanceEditTitle,#attendanceHistoryView .attendance-edit{display:none!important}
         .attendance-month-tabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0;padding:6px 0}.attendance-month-tab,.attendance-month-arrow{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.045);color:var(--chalk);border-radius:8px;padding:7px 10px;cursor:pointer;font-weight:700}.attendance-month-tab.active{background:rgba(99,214,139,.16)!important;border-color:var(--green)!important;box-shadow:inset 0 0 0 1px rgba(99,214,139,.25)!important;color:#f7fff9!important}.attendance-month-arrow{font-size:20px;line-height:1;padding:5px 10px}.attendance-scroll-hint{font-size:12px;color:var(--muted);margin-top:4px}
         @media(max-width:700px){#attendanceMonthOverview.month-overview{height:62vh!important;max-height:62vh!important;min-height:300px!important}.attendance-month-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px}.attendance-month-tab{flex:0 0 auto}}
       `;d.head.appendChild(s);
@@ -66,5 +88,6 @@
     renderTabs();return true;
   }
 
-  frame.addEventListener('load',()=>setTimeout(install,900));let tries=0;const timer=setInterval(()=>{install();if(++tries>60)clearInterval(timer)},250);
+  frame.addEventListener('load',()=>setTimeout(install,900));
+  let tries=0;const timer=setInterval(()=>{install();if(++tries>120)clearInterval(timer)},250);
 })();
