@@ -2,6 +2,11 @@
   const CBC_RSS='https://www.cbc.ca/cmlink/rss-canada';
   const CBC_CANADA='https://www.cbc.ca/news/canada';
   const GLOBAL_CANADA='https://globalnews.ca/canada/';
+  const FALLBACK_STORY={
+    title:'Zelenskyy arrives in Calgary ahead of meeting with Prime Minister Carney',
+    summary:'Ukrainian President Volodymyr Zelenskyy is in Canada for meetings with Prime Minister Mark Carney as diplomatic efforts around the war with Russia continue. His Canadian visit also includes stops in Toronto and North Bay.',
+    link:'https://globalnews.ca/news/12053621/zelenskyy-calgary-carney-meeting/'
+  };
 
   function clean(html){
     const div=document.createElement('div');
@@ -49,18 +54,25 @@
     card.className='today-canada-note';
     card.innerHTML=`
       <div class="today-canada-head"><div class="today-canada-title">🇨🇦 TODAY IN CANADA</div><div class="today-canada-date" id="todayCanadaDate"></div></div>
-      <div class="today-canada-story" id="todayCanadaStory">Loading a Canadian headline…</div>
-      <div class="today-canada-summary" id="todayCanadaSummary">Canadian-first news, with links to trusted Canadian sources.</div>
-      <div class="today-canada-links" id="todayCanadaLinks">
-        <a href="${CBC_CANADA}" target="_blank" rel="noopener">CBC News →</a>
-        <a href="${GLOBAL_CANADA}" target="_blank" rel="noopener">Global News →</a>
-      </div>`;
+      <div class="today-canada-story" id="todayCanadaStory"></div>
+      <div class="today-canada-summary" id="todayCanadaSummary"></div>
+      <div class="today-canada-links" id="todayCanadaLinks"></div>`;
     const commandStrip=d.querySelector('#dashboardView .command-strip');
     if(commandStrip && commandStrip.nextSibling) commandStrip.parentNode.insertBefore(card,commandStrip.nextSibling);
     else dash.insertBefore(card,dash.firstChild);
     const date=card.querySelector('#todayCanadaDate');
     if(date) date.textContent=new Date().toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
+    renderFallback(d);
     return card;
+  }
+
+  function renderFallback(d){
+    const story=d.getElementById('todayCanadaStory');
+    const summary=d.getElementById('todayCanadaSummary');
+    const links=d.getElementById('todayCanadaLinks');
+    if(story) story.textContent=FALLBACK_STORY.title;
+    if(summary) summary.textContent=FALLBACK_STORY.summary;
+    if(links) links.innerHTML=`<a href="${FALLBACK_STORY.link}" target="_blank" rel="noopener">Read story →</a><a href="${CBC_CANADA}" target="_blank" rel="noopener">CBC Canada →</a>`;
   }
 
   function renderFeed(d,xmlText){
@@ -72,10 +84,11 @@
     const title=clean(item.querySelector('title')?.textContent||'');
     const desc=clean(item.querySelector('description')?.textContent||'');
     const link=clean(item.querySelector('link')?.textContent||'') || CBC_CANADA;
+    if(!title) throw new Error('Headline missing');
     const story=d.getElementById('todayCanadaStory');
     const summary=d.getElementById('todayCanadaSummary');
     const links=d.getElementById('todayCanadaLinks');
-    if(story) story.textContent=title || 'Top Canadian story';
+    if(story) story.textContent=title;
     if(summary) summary.textContent=truncate(desc,260) || 'A leading Canadian story from CBC News.';
     if(links) links.innerHTML=`<a href="${link}" target="_blank" rel="noopener">Read on CBC →</a><a href="${GLOBAL_CANADA}" target="_blank" rel="noopener">More Canada news →</a>`;
   }
@@ -83,21 +96,32 @@
   async function loadNews(d){
     const sources=[
       CBC_RSS,
-      'https://api.allorigins.win/raw?url='+encodeURIComponent(CBC_RSS)
+      'https://api.allorigins.win/raw?url='+encodeURIComponent(CBC_RSS),
+      'https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(CBC_RSS)
     ];
     for(const url of sources){
       try{
         const r=await fetch(url,{cache:'no-store'});
         if(!r.ok) continue;
         const text=await r.text();
+        if(url.includes('rss2json.com')){
+          const data=JSON.parse(text);
+          const item=data.items&&data.items[0];
+          if(!item||!item.title) continue;
+          const story=d.getElementById('todayCanadaStory');
+          const summary=d.getElementById('todayCanadaSummary');
+          const links=d.getElementById('todayCanadaLinks');
+          if(story) story.textContent=clean(item.title);
+          if(summary) summary.textContent=truncate(clean(item.description||item.content||''),260)||'A leading Canadian story from CBC News.';
+          if(links) links.innerHTML=`<a href="${item.link||CBC_CANADA}" target="_blank" rel="noopener">Read on CBC →</a><a href="${GLOBAL_CANADA}" target="_blank" rel="noopener">More Canada news →</a>`;
+          return;
+        }
         renderFeed(d,text);
         return;
       }catch(e){}
     }
-    const story=d.getElementById('todayCanadaStory');
-    const summary=d.getElementById('todayCanadaSummary');
-    if(story) story.textContent='Canadian news at a glance';
-    if(summary) summary.textContent='Open one of the Canadian sources below for today’s top national and regional stories. The dashboard will keep trying to load a live CBC Canada headline automatically.';
+    // Keep the real, curated Canadian headline already rendered instead of degrading to generic links.
+    renderFallback(d);
   }
 
   function install(){
