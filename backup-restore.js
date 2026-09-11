@@ -1,115 +1,19 @@
 (function(){
   const frame=document.getElementById('app');
   if(!frame)return;
-
-  const CLASS_KEY='neil_teacher_classes_v1';
-  const ASSIGN_KEY='neil_teacher_assignments_v1';
-  const PERSIST_KEY='neil_teacher_dashboard_v2';
-
-  function readJson(w,key,fallback){
-    try{const raw=w.localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
-  }
-
-  function currentPayload(w){
-    try{if(typeof w.saveTeacherState==='function')w.saveTeacherState()}catch(e){}
-    const studentData=(w.state&&w.state.students)?w.state:readJson(w,PERSIST_KEY,{});
-    const courses=readJson(w,CLASS_KEY,{courses:Object.keys(w.ROSTERS||{}).map(name=>({name,archived:false,students:[...(w.ROSTERS[name]||[])]}))});
-    const assignments=readJson(w,ASSIGN_KEY,{classes:{}});
-    return {
-      format:'teacher-command-centre-winston-export',
-      version:12,
-      exportedAt:new Date().toISOString(),
-      teacherApp:{currentClass:w.currentClass||studentData.currentClass||'',courses,studentData},
-      assignmentTracker:assignments
-    };
-  }
-
-  function downloadBackup(w){
-    const payload=currentPayload(w);
-    const text=JSON.stringify(payload,null,2);
-    const blob=new Blob([text],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=w.document.createElement('a');
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    a.href=url;a.download='teacher-command-centre-backup-'+stamp+'.json';
-    w.document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500);
-  }
-
-  function extract(parsed){
-    if(!parsed||typeof parsed!=='object')throw new Error('The selected file is not a valid dashboard backup.');
-    if(parsed.format==='teacher-command-centre-winston-export'){
-      const app=parsed.teacherApp||{};
-      const studentData=app.studentData;
-      if(!studentData||!studentData.students)throw new Error('This Winston export does not contain student dashboard data.');
-      return {studentData,courses:app.courses||null,assignments:parsed.assignmentTracker||null,currentClass:app.currentClass||studentData.currentClass||''};
-    }
-    if(parsed.students){
-      return {studentData:parsed,courses:null,assignments:null,currentClass:parsed.currentClass||''};
-    }
-    if(parsed.teacherApp&&parsed.teacherApp.studentData&&parsed.teacherApp.studentData.students){
-      const app=parsed.teacherApp;
-      return {studentData:app.studentData,courses:app.courses||null,assignments:parsed.assignmentTracker||null,currentClass:app.currentClass||app.studentData.currentClass||''};
-    }
-    throw new Error('I could not find Teacher Command Centre data in this file.');
-  }
-
-  function restoreParsed(w,parsed){
-    const data=extract(parsed);
-    if(data.currentClass)data.studentData.currentClass=data.currentClass;
-    data.studentData.lastSavedAt=new Date().toISOString();
-    const stateText=JSON.stringify(data.studentData);
-    w.localStorage.setItem(w.KEY||'neil_teacher_dashboard',stateText);
-    w.localStorage.setItem(PERSIST_KEY,stateText);
-    try{w.parent.localStorage.setItem(PERSIST_KEY,stateText)}catch(e){}
-    try{w.top.localStorage.setItem(PERSIST_KEY,stateText)}catch(e){}
-    if(data.courses)w.localStorage.setItem(CLASS_KEY,JSON.stringify(data.courses));
-    if(data.assignments)w.localStorage.setItem(ASSIGN_KEY,JSON.stringify(data.assignments));
-    return data;
-  }
-
-  function install(){
-    const d=frame.contentDocument,w=frame.contentWindow;
-    if(!d||!w||!d.body||!w.state||!w.KEY)return false;
-    if(d.getElementById('backupRestoreControls'))return true;
-    const nav=d.querySelector('.nav');if(!nav)return false;
-
-    const marker=d.createElement('div');marker.id='backupRestoreControls';marker.hidden=true;d.body.appendChild(marker);
-    const input=d.createElement('input');input.type='file';input.accept='.json,application/json,text/plain';input.id='restoreBackupFile';input.style.display='none';d.body.appendChild(input);
-
-    const backup=d.createElement('button');backup.id='downloadBackupBtn';backup.type='button';backup.textContent='⬆ Backup File';backup.title='Download a complete backup file of this dashboard';
-    const restore=d.createElement('button');restore.id='restoreBackupBtn';restore.type='button';restore.textContent='⬇ Restore Backup';restore.title='Restore this dashboard from a backup or Winston export file';
-    const reset=d.getElementById('resetBtn');
-    if(reset){nav.insertBefore(backup,reset);nav.insertBefore(restore,reset)}else{nav.appendChild(backup);nav.appendChild(restore)}
-
-    backup.onclick=function(){
-      try{downloadBackup(w);const old=backup.textContent;backup.textContent='✓ Backup Downloaded';setTimeout(()=>backup.textContent=old,1800)}
-      catch(err){alert('Backup failed: '+(err&&err.message?err.message:err));}
-    };
-
-    restore.onclick=function(){input.value='';input.click()};
-    input.onchange=async function(){
-      const file=input.files&&input.files[0];if(!file)return;
-      try{
-        const text=await file.text();
-        const parsed=JSON.parse(text);
-        const preview=extract(parsed);
-        const classCount=preview.studentData&&preview.studentData.students?Object.keys(preview.studentData.students).length:0;
-        let studentCount=0;Object.values(preview.studentData.students||{}).forEach(group=>studentCount+=Object.keys(group||{}).length);
-        const assignmentCount=preview.assignments&&preview.assignments.classes?Object.values(preview.assignments.classes).reduce((n,c)=>n+((c&&c.assignments)||[]).length,0):0;
-        const when=parsed.exportedAt?new Date(parsed.exportedAt).toLocaleString():'unknown date';
-        const ok=confirm('Restore this backup?\n\nBackup date: '+when+'\nClasses: '+classCount+'\nStudent records: '+studentCount+'\nAssignments: '+assignmentCount+'\n\nThis will replace the dashboard data currently stored on this device.');
-        if(!ok)return;
-        restoreParsed(w,parsed);
-        alert('Backup restored successfully. The dashboard will reload now.');
-        w.top.location.reload();
-      }catch(err){
-        alert('Restore failed. No data was changed.\n\n'+(err&&err.message?err.message:String(err)));
-      }
-    };
-    return true;
-  }
-
-  frame.addEventListener('load',()=>setTimeout(install,700));
-  let tries=0;const timer=setInterval(()=>{if(install()||++tries>60)clearInterval(timer)},250);
+  const CLASS_KEY='neil_teacher_classes_v1',ASSIGN_KEY='neil_teacher_assignments_v1',PERSIST_KEY='neil_teacher_dashboard_v2';
+  function readJson(w,key,fallback){try{const raw=w.localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}}
+  function currentPayload(w){try{if(typeof w.saveTeacherState==='function')w.saveTeacherState()}catch(e){}const studentData=(w.state&&w.state.students)?w.state:readJson(w,PERSIST_KEY,{});const courses=readJson(w,CLASS_KEY,{courses:Object.keys(w.ROSTERS||{}).map(name=>({name,archived:false,students:[...(w.ROSTERS[name]||[])]}))});const assignments=readJson(w,ASSIGN_KEY,{classes:{}});return{format:'teacher-command-centre-winston-export',version:12,exportedAt:new Date().toISOString(),teacherApp:{currentClass:w.currentClass||studentData.currentClass||'',courses,studentData},assignmentTracker:assignments}}
+  function downloadBackup(w){const text=JSON.stringify(currentPayload(w),null,2),blob=new Blob([text],{type:'application/json'}),url=URL.createObjectURL(blob),a=w.document.createElement('a'),stamp=new Date().toISOString().replace(/[:.]/g,'-');a.href=url;a.download='teacher-command-centre-backup-'+stamp+'.json';w.document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+  function extract(parsed){if(!parsed||typeof parsed!=='object')throw new Error('This is not valid dashboard backup data.');if(parsed.format==='teacher-command-centre-winston-export'||(parsed.teacherApp&&parsed.teacherApp.studentData)){const app=parsed.teacherApp||{},studentData=app.studentData;if(!studentData||!studentData.students)throw new Error('This Winston export does not contain student dashboard data.');return{studentData,courses:app.courses||null,assignments:parsed.assignmentTracker||null,currentClass:app.currentClass||studentData.currentClass||''}}if(parsed.students)return{studentData:parsed,courses:null,assignments:null,currentClass:parsed.currentClass||''};throw new Error('I could not find Teacher Command Centre data in what you supplied.')}
+  function restoreParsed(w,parsed){const data=extract(parsed);if(data.currentClass)data.studentData.currentClass=data.currentClass;data.studentData.lastSavedAt=new Date().toISOString();const stateText=JSON.stringify(data.studentData);w.localStorage.setItem(w.KEY||'neil_teacher_dashboard',stateText);w.localStorage.setItem(PERSIST_KEY,stateText);try{w.parent.localStorage.setItem(PERSIST_KEY,stateText)}catch(e){}try{w.top.localStorage.setItem(PERSIST_KEY,stateText)}catch(e){}if(data.courses)w.localStorage.setItem(CLASS_KEY,JSON.stringify(data.courses));if(data.assignments)w.localStorage.setItem(ASSIGN_KEY,JSON.stringify(data.assignments));return data}
+  function previewText(parsed){const p=extract(parsed);let students=0;Object.values(p.studentData.students||{}).forEach(g=>students+=Object.keys(g||{}).length);const assignments=p.assignments&&p.assignments.classes?Object.values(p.assignments.classes).reduce((n,c)=>n+((c&&c.assignments)||[]).length,0):0;return 'Backup date: '+(parsed.exportedAt?new Date(parsed.exportedAt).toLocaleString():'unknown')+'\nClasses: '+Object.keys(p.studentData.students||{}).length+'\nStudent records: '+students+'\nAssignments: '+assignments}
+  function doRestore(w,parsed){if(!confirm('Restore this backup?\n\n'+previewText(parsed)+'\n\nThis will replace the dashboard data currently stored on this device.'))return;restoreParsed(w,parsed);alert('Backup restored successfully. The dashboard will reload now.');w.top.location.reload()}
+  function install(){const d=frame.contentDocument,w=frame.contentWindow;if(!d||!w||!d.body||!w.state||!w.KEY)return false;if(d.getElementById('backupRestoreControls'))return true;const nav=d.querySelector('.nav');if(!nav)return false;
+    const marker=d.createElement('div');marker.id='backupRestoreControls';marker.hidden=true;d.body.appendChild(marker);const input=d.createElement('input');input.type='file';input.accept='.json,application/json,text/plain';input.style.display='none';d.body.appendChild(input);
+    const backup=d.createElement('button');backup.type='button';backup.textContent='⬆ Backup File';const restore=d.createElement('button');restore.type='button';restore.textContent='⬇ Restore Backup';const paste=d.createElement('button');paste.type='button';paste.textContent='📋 Paste Restore Data';paste.title='Paste a complete Send to Winston backup directly into the app';const reset=d.getElementById('resetBtn');[backup,restore,paste].forEach(b=>reset?nav.insertBefore(b,reset):nav.appendChild(b));
+    backup.onclick=()=>{try{downloadBackup(w);const old=backup.textContent;backup.textContent='✓ Backup Downloaded';setTimeout(()=>backup.textContent=old,1800)}catch(err){alert('Backup failed: '+err.message)}};restore.onclick=()=>{input.value='';input.click()};input.onchange=async()=>{const f=input.files&&input.files[0];if(!f)return;try{doRestore(w,JSON.parse(await f.text()))}catch(err){alert('Restore failed. No data was changed.\n\n'+err.message)}};
+    paste.onclick=()=>{const wrap=d.createElement('div');wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';wrap.innerHTML='<div style="width:min(850px,96vw);max-height:90vh;overflow:auto;background:#17332e;color:#f3f0df;border:2px solid #6f8e82;border-radius:14px;padding:20px"><h2 style="margin-top:0">Paste Restore Data</h2><p>Paste the complete <b>Send to Winston</b> export below. Nothing changes until you press Restore.</p><textarea style="width:100%;height:45vh;box-sizing:border-box;font:12px/1.35 monospace" placeholder="Paste the JSON backup here..."></textarea><div style="display:flex;gap:10px;margin-top:12px"><button data-go>Restore Pasted Backup</button><button data-cancel>Cancel</button></div><div data-status style="margin-top:10px"></div></div>';d.body.appendChild(wrap);const ta=wrap.querySelector('textarea'),status=wrap.querySelector('[data-status]');ta.focus();wrap.querySelector('[data-cancel]').onclick=()=>wrap.remove();wrap.querySelector('[data-go]').onclick=()=>{try{const parsed=JSON.parse(ta.value.trim());status.textContent='Backup recognized. '+previewText(parsed).replace(/\n/g,' · ');doRestore(w,parsed)}catch(err){status.textContent='Not restored: '+err.message;status.style.color='#ff9f5a'}}};
+    return true}
+  frame.addEventListener('load',()=>setTimeout(install,700));let tries=0,t=setInterval(()=>{if(install()||++tries>60)clearInterval(t)},250);
 })();
