@@ -27,13 +27,36 @@ function loadExtras(){
     bridge.textContent=`
       window.ROSTERS=ROSTERS;window.KEY=KEY;window.esc=esc;window.renderAll=renderAll;window.absences=absences;
       const PERSIST_KEY='neil_teacher_dashboard_v2';
-      function rebuildState(saved){const fresh=blankState();if(!saved||!saved.students)return fresh;Object.keys(fresh.students).forEach(function(c){Object.keys(fresh.students[c]).forEach(function(n){if(saved.students&&saved.students[c]&&saved.students[c][n])fresh.students[c][n]=saved.students[c][n];});});fresh.currentClass=saved.currentClass||fresh.currentClass;fresh.assignments=Array.isArray(saved.assignments)?saved.assignments:[];Object.keys(saved).forEach(function(k){if(k!=='students'&&k!=='currentClass'&&k!=='assignments')fresh[k]=saved[k];});return fresh;}
-      function readBestSavedState(){for(const k of [PERSIST_KEY,KEY]){try{const raw=localStorage.getItem(k);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.students)return parsed;}}catch(e){}}return null;}
-      const recovered=readBestSavedState();if(recovered){state=rebuildState(recovered);currentClass=state.currentClass||currentClass||'Civics';}
+      const RESTORE_KEY='neil_teacher_restore_pending_v1';
+      function clone(x){return JSON.parse(JSON.stringify(x));}
+      function rebuildState(saved){
+        const fresh=blankState();
+        if(!saved||!saved.students)return fresh;
+        const merged=clone(saved);
+        if(!merged.students)merged.students={};
+        Object.keys(fresh.students).forEach(function(c){
+          if(!merged.students[c])merged.students[c]={};
+          Object.keys(fresh.students[c]).forEach(function(n){
+            if(!merged.students[c][n])merged.students[c][n]=fresh.students[c][n];
+          });
+        });
+        merged.currentClass=saved.currentClass||fresh.currentClass;
+        if(!Array.isArray(merged.assignments))merged.assignments=[];
+        return merged;
+      }
+      function readBestSavedState(){
+        for(const k of [RESTORE_KEY,PERSIST_KEY,KEY]){
+          try{const raw=localStorage.getItem(k);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.students)return parsed;}}catch(e){}
+        }
+        return null;
+      }
+      const hadPendingRestore=!!localStorage.getItem(RESTORE_KEY);
+      const recovered=readBestSavedState();
+      if(recovered){state=rebuildState(recovered);currentClass=state.currentClass||currentClass||'Civics';}
       function persistTeacherState(){try{state.currentClass=currentClass;state.lastSavedAt=new Date().toISOString();const json=JSON.stringify(state);localStorage.setItem(KEY,json);localStorage.setItem(PERSIST_KEY,json);try{window.parent.localStorage.setItem(PERSIST_KEY,json);}catch(e){}try{window.top.localStorage.setItem(PERSIST_KEY,json);}catch(e){}return true;}catch(e){console.error('Teacher dashboard save failed',e);return false;}}
       save=function(){persistTeacherState();renderAll();};window.saveTeacherState=function(){const ok=persistTeacherState();renderAll();return ok;};window.state=state;Object.defineProperty(window,'currentClass',{configurable:true,get:function(){return currentClass;},set:function(v){currentClass=v;state.currentClass=v;persistTeacherState();}});
       if(!document.getElementById('manualSaveBtn')){const nav=document.querySelector('.nav');if(nav){const btn=document.createElement('button');btn.id='manualSaveBtn';btn.type='button';btn.textContent='💾 Save Now';btn.title='Manually save all dashboard information on this device';btn.onclick=function(){const ok=persistTeacherState();const original='💾 Save Now';btn.textContent=ok?'✓ Saved':'⚠ Save failed';btn.style.borderColor=ok?'#63d68b':'#ff6b6b';setTimeout(function(){btn.textContent=original;btn.style.borderColor='';},1800);};const reset=document.getElementById('resetBtn');if(reset)nav.insertBefore(btn,reset);else nav.appendChild(btn);}}
-      window.addEventListener('pagehide',persistTeacherState);window.addEventListener('beforeunload',persistTeacherState);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')persistTeacherState();});persistTeacherState();renderAll();
+      window.addEventListener('pagehide',persistTeacherState);window.addEventListener('beforeunload',persistTeacherState);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')persistTeacherState();});persistTeacherState();if(hadPendingRestore)localStorage.removeItem(RESTORE_KEY);renderAll();
     `;legacyDoc.body.appendChild(bridge);return true;
   };
   function addScript(src,onload){const s=coreDoc.createElement('script');s.src=src;if(onload)s.onload=onload;coreDoc.body.appendChild(s)}
@@ -42,7 +65,7 @@ function loadExtras(){
       clearInterval(timer);
       addScript('v1-controls.js?v=20260910-direct-winston-v11',()=>{
         addScript('notes-export.js?v=20260910-source-v7');
-        addScript('backup-restore.js?v=20260911-restore-v1');
+        addScript('backup-restore.js?v=20260911-restore-v3');
         addScript('roster-delete.js?v=20260910-manual-save');
         addScript('reminders.js?v=20260910-reminder-layout-v2');
         addScript('navigation-fix.js?v=20260910-manual-save',()=>{
