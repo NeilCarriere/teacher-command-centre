@@ -37,15 +37,24 @@
     d.body.appendChild(o);const close=()=>o.remove();o.querySelector('[data-close]').onclick=close;o.onclick=e=>{if(e.target===o)close()};
   }
 
+  function ensureSingleHint(d,box){
+    const parent=box.parentNode;if(!parent)return;
+    const candidates=[...parent.querySelectorAll(':scope > .alert-click-hint, :scope > .attendance-global-note')];
+    let note=candidates.find(el=>el.id==='attendanceGlobalNote')||candidates[0];
+    if(!note){note=d.createElement('div');parent.insertBefore(note,box)}
+    note.id='attendanceGlobalNote';
+    note.classList.add('alert-click-hint','attendance-global-note');
+    note.style.display='';
+    note.textContent='Across all active classes. Click a threshold to see names and classes.';
+    candidates.forEach(el=>{if(el!==note)el.remove()});
+    if(note.nextElementSibling!==box)parent.insertBefore(note,box);
+  }
+
   function refresh(){
     const d=frame.contentDocument,w=frame.contentWindow;if(!d||!w||!w.state)return false;
     ensureStyle(d);
     const box=d.querySelector('#dashboardView .kpis');if(!box)return false;
-    let note=box.previousElementSibling;
-    if(!note||!note.classList?.contains('attendance-global-note')){
-      note=d.createElement('div');note.className='attendance-global-note';note.textContent='Across all active classes. Click a threshold to see names and classes.';box.parentNode.insertBefore(note,box);
-      const old=box.parentNode.querySelector('.alert-click-hint');if(old&&old!==note)old.style.display='none';
-    }
+    ensureSingleHint(d,box);
     [5,10,15,20].forEach(t=>{
       const n=d.getElementById('a'+t);if(!n)return;
       n.textContent=atThreshold(w,t).length;
