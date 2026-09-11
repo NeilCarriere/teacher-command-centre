@@ -4,6 +4,7 @@
 
   const CLASS_KEY='neil_teacher_classes_v1';
   const ASSIGN_KEY='neil_teacher_assignments_v1';
+  const REMINDER_KEY='neil_teacher_reminders_v1';
   const PERSIST_KEY='neil_teacher_dashboard_v2';
 
   function readJson(w,key,fallback){
@@ -14,18 +15,20 @@
     try{if(typeof w.saveTeacherState==='function')w.saveTeacherState()}catch(e){}
     const courses=readJson(w,CLASS_KEY,{courses:Object.keys(w.ROSTERS||{}).map(name=>({name,archived:false,students:[...(w.ROSTERS[name]||[])]}))});
     const assignments=readJson(w,ASSIGN_KEY,{});
+    const reminders=readJson(w,REMINDER_KEY,[]);
     const persisted=readJson(w,PERSIST_KEY,null);
     const studentData=(w.state&&w.state.students)?w.state:(persisted||w.state||{});
     return JSON.stringify({
       format:'teacher-command-centre-winston-export',
-      version:11,
+      version:14,
       exportedAt:new Date().toISOString(),
       teacherApp:{
         currentClass:w.currentClass||studentData.currentClass||'',
         courses:courses,
         studentData:studentData
       },
-      assignmentTracker:assignments
+      assignmentTracker:assignments,
+      reminders:reminders
     },null,2);
   }
 
@@ -134,8 +137,6 @@
     const d=frame.contentDocument;
     if(!d||!d.body)return false;
 
-    // Install the correct Winston panel before v1-inner runs so its obsolete
-    // JSON-download block never gets a chance to create the old screen.
     installWinston();
     watch();
 
