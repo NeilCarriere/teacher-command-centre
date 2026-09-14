@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 16;
+  const APP_VERSION = 17;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -56,7 +56,7 @@
     manage: {
       eyebrow: 'THE ACTIVE ROSTER DRIVES THE APP',
       title: 'Manage Classes',
-      subtitle: 'Keep current classes tidy while preserving useful historical records.'
+      subtitle: 'Keep current classes tidy. Removing a student clears their records for that class.'
     },
     backup: {
       eyebrow: 'LOCAL-FIRST · PORTABLE · RECOVERABLE',
@@ -338,14 +338,16 @@
 
   function normalizeAssignment(item, activeStudents) {
     const source = isObject(item) ? item : {};
+    const roster = uniqueStrings(activeStudents);
+    const rosterNames = new Set(roster);
     const studentData = {};
     if (isObject(source.students)) {
       Object.entries(source.students).forEach(([name, submission]) => {
         const safeName = text(name);
-        if (safeName) studentData[safeName] = normalizeSubmission(submission);
+        if (safeName && rosterNames.has(safeName)) studentData[safeName] = normalizeSubmission(submission);
       });
     }
-    uniqueStrings(activeStudents).forEach((name) => {
+    roster.forEach((name) => {
       if (!studentData[name]) studentData[name] = normalizeSubmission({});
     });
     return {
@@ -400,12 +402,14 @@
     const rawStudents = isObject(dataSource.students) ? dataSource.students : {};
     const courses = normalizeCourses(appSource.courses || source.courses, rawStudents);
 
+    const rosterByCourse = new Map(courses.map((course) => [course.name, new Set(course.students)]));
     Object.entries(rawStudents).forEach(([courseName, studentRecords]) => {
-      if (!isObject(studentRecords)) return;
+      const roster = rosterByCourse.get(courseName);
+      if (!isObject(studentRecords) || !roster) return;
       next.studentData.students[courseName] = {};
       Object.entries(studentRecords).forEach(([studentName, record]) => {
         const safeName = text(studentName);
-        if (safeName) next.studentData.students[courseName][safeName] = normalizeStudentRecord(record);
+        if (safeName && roster.has(safeName)) next.studentData.students[courseName][safeName] = normalizeStudentRecord(record);
       });
     });
 
@@ -984,7 +988,7 @@
     byId('manageCourse').innerHTML = courseOptions(ui.manageCourse);
     byId('courseList').innerHTML = asArray(state.courses.courses).length ? state.courses.courses.map((course) => `<div class="manage-row ${course.archived ? 'archived' : ''}"><div><strong>${escapeHtml(course.name)}</strong><span>${course.students.length} students · ${course.archived ? 'Archived' : 'Active'}</span></div><div class="manage-actions"><button type="button" class="mini-button" data-action="rename-course" data-course="${escapeAttr(course.name)}">Rename</button><button type="button" class="mini-button" data-action="archive-course" data-course="${escapeAttr(course.name)}">${course.archived ? 'Restore' : 'Archive'}</button></div></div>`).join('') : '<p class="empty-copy">No classes yet.</p>';
     const course = findCourse(ui.manageCourse);
-    byId('studentList').innerHTML = course ? (course.students.length ? course.students.map((student) => `<div class="manage-row"><div><strong>${escapeHtml(student)}</strong><span>Active roster</span></div><div class="manage-actions"><button type="button" class="mini-button" data-action="rename-student" data-course="${escapeAttr(course.name)}" data-student="${escapeAttr(student)}">Rename</button><button type="button" class="mini-button" data-action="remove-student" data-course="${escapeAttr(course.name)}" data-student="${escapeAttr(student)}">Remove</button></div></div>`).join('') : '<p class="empty-copy">No students are on this active roster.</p>') : '<p class="empty-copy">Select an active class to manage students.</p>';
+    byId('studentList').innerHTML = course ? (course.students.length ? course.students.map((student) => `<div class="manage-row"><div><strong>${escapeHtml(student)}</strong><span>Active roster</span></div><div class="manage-actions"><button type="button" class="mini-button" data-action="rename-student" data-course="${escapeAttr(course.name)}" data-student="${escapeAttr(student)}">Rename</button><button type="button" class="mini-button" data-action="remove-student" data-course="${escapeAttr(course.name)}" data-student="${escapeAttr(student)}">Remove &amp; clear</button></div></div>`).join('') : '<p class="empty-copy">No students are on this active roster.</p>') : '<p class="empty-copy">Select an active class to manage students.</p>';
   }
 
   function renderBackup() {
@@ -999,7 +1003,7 @@
       return;
     }
     notice.classList.remove('hidden');
-    notice.textContent = 'Your existing local dashboard data was safely migrated into the cleaned v15 format. Current active rosters stay authoritative; historical records remain in the data without being re-added to a roster.';
+    notice.textContent = 'Your existing local dashboard data was safely migrated into the cleaned v17 format. Current active rosters are authoritative; students no longer on a roster are cleared from the dashboard data.';
   }
 
   function renderAll() {
@@ -1257,10 +1261,17 @@
   function removeStudentFromRoster(courseName, studentName) {
     const course = findCourse(courseName);
     if (!course || !course.students.includes(studentName)) return;
-    if (!window.confirm(`Remove ${studentName} from the active ${courseName} roster? Their historical records will be preserved, not deleted.`)) return;
+    const message = `Remove ${studentName} from ${courseName}? This permanently clears their attendance, participation, notes, and assignment records for this class. A previous backup is the only way to restore them.`;
+    if (!window.confirm(message)) return;
     course.students = course.students.filter((student) => student !== studentName);
+    const records = state.studentData.students[courseName];
+    if (records) delete records[studentName];
+    assignmentsFor(courseName).forEach((assignment) => {
+      delete assignment.students[studentName];
+    });
+    if (ui.notesCourse === courseName && ui.notesStudent === studentName) ui.notesStudent = '';
     ensureSelections();
-    save('Student removed from active roster');
+    save('Student and related records removed');
   }
 
   function updateAssignmentSubmission(target) {
