@@ -315,14 +315,15 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
 .class-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
-  margin-bottom: 15px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
+/* A compact, always-visible launch row for the three active classes. */
 .class-card {
   position: relative;
-  min-height: 132px;
-  padding: 15px;
+  min-height: 104px;
+  padding: 12px 13px;
   overflow: hidden;
   cursor: pointer;
 }
@@ -348,9 +349,10 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
   transform: rotate(11deg);
 }
 
-.class-card h2 { font-size: 21px; line-height: 1.15; }
-.class-card p { margin: 5px 0 11px; color: var(--muted); font-size: 13px; }
-.class-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.class-card h2 { font-size: clamp(17px, 1.8vw, 20px); line-height: 1.1; }
+.class-card p { margin: 4px 0 8px; color: var(--muted); font-size: 12px; }
+.class-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 5px; }
+.class-card .mini-button { padding: 5px 7px; font-size: 11px; }
 
 .mini-button, .text-button, .icon-button {
   padding: 6px 8px;
@@ -610,7 +612,6 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 @media (max-width: 1100px) {
   .command-strip { grid-template-columns: 1fr 1fr; }
   .command-strip .welcome-card { grid-column: 1 / -1; }
-  .class-cards { grid-template-columns: 1fr; }
   .dashboard-grid, .manage-grid { grid-template-columns: 1fr; }
   .roster-panel { margin-bottom: 15px; }
 }
@@ -633,6 +634,10 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   .word-card, .canada-note { transform: none; }
   .threshold-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .modal-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .class-cards { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
