@@ -1,15 +1,272 @@
-[eval]:1
-process.stdout.write(require('fs').readFileSync(index.html, 'utf8'))
-                                                ^
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102421">
+  <meta name="description" content="A private, local-first teacher dashboard for planning, tracking, and reviewing classroom information.">
+  <title>Neil's Teacher Command Centre</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand">
+        <span>Neil's</span>
+        <strong>Teacher Command Centre</strong>
+        <small>plan · teach · track · breathe</small>
+      </div>
+      <div class="chalk-line"></div>
 
-ReferenceError: index is not defined
-    at [eval]:1:49
-    at runScriptInThisContext (node:internal/vm:219:10)
-    at node:internal/process/execution:451:12
-    at [eval]-wrapper:6:24
-    at runScriptInContext (node:internal/process/execution:449:60)
-    at evalFunction (node:internal/process/execution:283:30)
-    at evalTypeScript (node:internal/process/execution:295:3)
-    at node:internal/main/eval_string:71:3
+      <nav class="nav" aria-label="Dashboard sections">
+        <button type="button" class="nav-button active" data-view="dashboard">⌂ Home</button>
+        <button type="button" class="nav-button" data-view="attendance">✓ Attendance</button>
+        <button type="button" class="nav-button" data-view="assignments">▤ Assignments</button>
+        <button type="button" class="nav-button" data-view="notes">✎ Student Notes</button>
+        <button type="button" class="nav-button" data-view="reports">▥ Reports</button>
+        <button type="button" class="nav-button" data-view="manage">⚙ Manage Classes</button>
+        <button type="button" class="nav-button" data-view="backup">↗ Backup &amp; Restore</button>
+      </nav>
 
-Node.js v24.19.0
+      <div class="sidebar-footer">
+        <p id="saveStatus" class="save-status" aria-live="polite">Local-first · ready</p>
+        <p>“Progress, not perfection.”</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow" id="viewEyebrow">TEACHER COMMAND CENTRE</p>
+          <h1 id="viewTitle">Good day, Neil.</h1>
+          <p id="viewSubtitle">Everything important, without the pile of patches.</p>
+        </div>
+        <div class="header-date" id="todayLabel"></div>
+      </header>
+
+      <section id="migrationNotice" class="notice hidden" aria-live="polite"></section>
+
+      <section id="dashboardView" class="view">
+        <div id="commandStrip" class="command-strip"></div>
+        <div id="emptyState" class="empty-state hidden"></div>
+        <div id="classCards" class="class-cards"></div>
+
+        <div class="dashboard-grid">
+          <section class="panel roster-panel">
+            <div class="panel-heading split-heading">
+              <div>
+                <p class="panel-kicker">QUICK CHECK-IN</p>
+                <h2>Attendance — <span id="quickCourseLabel"></span></h2>
+              </div>
+              <label class="compact-field">
+                <span>Day</span>
+                <input type="date" id="quickDate" aria-label="Quick attendance date">
+              </label>
+            </div>
+            <p class="panel-help">Use any school day — including yesterday — then open Attendance for the complete month view.</p>
+            <div class="table-wrap">
+              <table id="quickRoster" class="data-table"></table>
+            </div>
+          </section>
+
+          <aside class="dashboard-side">
+            <section class="panel history-card">
+              <p class="panel-kicker" id="historyDate">TODAY IN HISTORY</p>
+              <h2 id="historyTitle">Loading today’s history…</h2>
+              <p id="historyText" class="card-copy"></p>
+              <p id="historyTrivia" class="trivia"></p>
+              <p id="historySource" class="card-source"></p>
+            </section>
+
+            <section class="canada-note" id="todayCanadaCard">
+              <div class="note-pin" aria-hidden="true"></div>
+              <div class="note-heading">
+                <h2>🇨🇦 TODAY IN CANADA</h2>
+                <button type="button" class="icon-button" data-action="refresh-news" aria-label="Refresh Canadian news">↻</button>
+              </div>
+              <p id="canadaNewsDate" class="note-date"></p>
+              <h3 id="canadaNewsTitle">Finding a Canadian headline…</h3>
+              <p id="canadaNewsSummary"></p>
+              <p id="canadaNewsLinks" class="news-links"></p>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading split-heading">
+                <div>
+                  <p class="panel-kicker">FOLLOW-UP</p>
+                  <h2>Attendance Alerts</h2>
+                </div>
+                <button type="button" class="text-button" data-view="reports">View report →</button>
+              </div>
+              <div id="attendanceAlertSummary" class="threshold-grid"></div>
+              <p class="panel-help">At 5, 10, or 15 A+E entries: <strong>TEXT JAKE</strong>. At 20: refer to Student Success Team.</p>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading split-heading">
+                <div>
+                  <p class="panel-kicker">ASSIGNMENTS</p>
+                  <h2>Missing Work</h2>
+                </div>
+                <button type="button" class="text-button" data-view="assignments">Open tracker →</button>
+              </div>
+              <div id="missingSummary" class="compact-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading split-heading">
+                <div>
+                  <p class="panel-kicker">KEEP MOVING</p>
+                  <h2>Reminders</h2>
+                </div>
+              </div>
+              <form id="reminderForm" class="inline-form">
+                <label class="sr-only" for="reminderText">Add a reminder</label>
+                <input id="reminderText" name="reminderText" autocomplete="off" placeholder="Add a reminder…">
+                <button type="submit" class="primary-button">Add</button>
+              </form>
+              <div id="reminderList" class="reminder-list"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="attendanceView" class="view hidden">
+        <section class="panel">
+          <div class="panel-heading split-heading">
+            <div>
+              <p class="panel-kicker">REVIEW OR CORRECT</p>
+              <h2>Attendance History</h2>
+              <p class="panel-help">Choose a class and date to edit the full roster. Every change saves immediately on this device.</p>
+            </div>
+            <button type="button" class="secondary-button" data-view="dashboard">← Home</button>
+          </div>
+          <div class="control-row">
+            <label>Class <select id="attendanceCourse"></select></label>
+            <label>Date <input type="date" id="attendanceDate"></label>
+            <label>Month <input type="month" id="attendanceMonth"></label>
+            <button type="button" class="secondary-button" data-action="attendance-today">Today</button>
+          </div>
+          <div id="attendanceSchoolDayNote" class="notice small-notice hidden"></div>
+          <div class="section-divider"></div>
+          <h3 id="attendanceDayTitle">Selected Day</h3>
+          <div class="table-wrap">
+            <table id="attendanceDayTable" class="data-table"></table>
+          </div>
+          <div class="section-divider"></div>
+          <div class="panel-heading">
+            <div>
+              <h3>Month at a Glance</h3>
+              <p class="panel-help">Click a school-day cell to choose P, A, E, L, or clear the entry.</p>
+            </div>
+          </div>
+          <div class="table-wrap attendance-grid-wrap">
+            <table id="attendanceMonthTable" class="data-table attendance-month-table"></table>
+          </div>
+        </section>
+      </section>
+
+      <section id="assignmentsView" class="view hidden">
+        <section class="panel">
+          <div class="panel-heading split-heading">
+            <div>
+              <p class="panel-kicker">TRACK · REVIEW · FOLLOW UP</p>
+              <h2>Assignment Tracker</h2>
+            </div>
+            <button type="button" class="secondary-button" data-action="show-add-assignment">＋ Add Assignment</button>
+          </div>
+          <div id="assignmentCourseTabs" class="course-tabs"></div>
+          <div id="assignmentSummary" class="assignment-summary"></div>
+          <div id="assignmentList" class="assignment-list"></div>
+          <div id="assignmentDetail" class="assignment-detail"></div>
+        </section>
+      </section>
+
+      <section id="notesView" class="view hidden">
+        <section class="panel">
+          <div class="panel-heading split-heading">
+            <div>
+              <p class="panel-kicker">OBSERVATIONS THAT STAY USEFUL</p>
+              <h2>Student Notes</h2>
+            </div>
+            <button type="button" class="secondary-button" data-action="show-add-note">＋ Add Note</button>
+          </div>
+          <div class="control-row slim-row">
+            <label>Class <select id="notesCourse"></select></label>
+            <label>Student <select id="notesStudent"></select></label>
+          </div>
+          <div id="notesList" class="notes-list"></div>
+        </section>
+      </section>
+
+      <section id="reportsView" class="view hidden">
+        <section class="panel">
+          <div class="panel-heading split-heading">
+            <div>
+              <p class="panel-kicker">QUICK FACTUAL SNAPSHOT</p>
+              <h2>Reports</h2>
+            </div>
+            <label class="compact-field">Class <select id="reportCourse"></select></label>
+          </div>
+          <div id="reportMetrics" class="metric-grid"></div>
+          <div class="table-wrap">
+            <table id="reportTable" class="data-table"></table>
+          </div>
+        </section>
+      </section>
+
+      <section id="manageView" class="view hidden">
+        <div class="manage-grid">
+          <section class="panel">
+            <p class="panel-kicker">ACTIVE ROSTERS ARE AUTHORITATIVE</p>
+            <h2>Manage Classes</h2>
+            <p class="panel-help">Archiving hides a class without deleting its historical records. Removing a student only removes them from the active roster.</p>
+            <form id="courseForm" class="inline-form">
+              <label class="sr-only" for="courseName">New class name</label>
+              <input id="courseName" name="courseName" autocomplete="off" placeholder="e.g. Geography S2">
+              <button type="submit" class="primary-button">Add Class</button>
+            </form>
+            <div id="courseList" class="manage-list"></div>
+          </section>
+
+          <section class="panel">
+            <p class="panel-kicker">ADD OR CORRECT ACTIVE ROSTERS</p>
+            <h2>Manage Students</h2>
+            <div class="control-row slim-row">
+              <label>Class <select id="manageCourse"></select></label>
+            </div>
+            <form id="studentForm" class="inline-form">
+              <label class="sr-only" for="studentName">Student display name</label>
+              <input id="studentName" name="studentName" autocomplete="off" placeholder="Student display name">
+              <button type="submit" class="primary-button">Add Student</button>
+            </form>
+            <div id="studentList" class="manage-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="backupView" class="view hidden">
+        <section class="panel backup-panel">
+          <p class="panel-kicker">YOUR CURRENT WORK, PORTABLE</p>
+          <h2>Backup &amp; Restore</h2>
+          <p class="panel-help">The dashboard stays local to this device. A backup file or copied Winston export gives you a tested recovery point whenever you need one.</p>
+          <div class="backup-actions">
+            <button type="button" class="primary-button" data-action="download-backup">⬇ Download Backup File</button>
+            <button type="button" class="secondary-button" data-action="open-import">⬆ Restore Backup File</button>
+            <button type="button" class="secondary-button" data-action="copy-backup">📋 Copy for Winston</button>
+          </div>
+          <p id="backupStatus" class="backup-status" aria-live="polite"></p>
+          <label for="backupPayload" class="backup-label">Copy-ready dashboard data</label>
+          <textarea id="backupPayload" readonly spellcheck="false" aria-label="Copy-ready dashboard backup"></textarea>
+          <p class="privacy-note"><strong>Privacy:</strong> this data includes student information. Paste it only into the teacher-dashboard conversation you intend to use.</p>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <input id="restoreFile" type="file" accept="application/json,.json,text/plain" hidden>
+  <div id="modalRoot" aria-live="polite"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
