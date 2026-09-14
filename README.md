@@ -15,7 +15,7 @@ A private, local-first teacher dashboard designed for iPad and desktop use.
 
 The app saves only in the browser on the device where it is used. Use **Backup & Restore** to download a recovery file or copy the complete data for the Winston workflow.
 
-Version 15 automatically migrates the earlier v14 local data and backup format. The active course roster remains authoritative: historical student records are retained but are never silently re-added to a current class.
+Version 16 automatically migrates earlier v14 and v15 local data and backup formats. Participation levels are now recorded by date, while earlier one-time levels remain visible as prior summaries. The active course roster remains authoritative: historical student records are retained but are never silently re-added to a current class.
 
 ## Project structure
 

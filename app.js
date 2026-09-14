@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 15;
+  const APP_VERSION = 16;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -248,7 +248,7 @@
   }
 
   function freshStudentRecord() {
-    return { attendance: [], participation: null, notes: [], missing: [] };
+    return { attendance: [], participation: null, participationHistory: [], notes: [], missing: [] };
   }
 
   function normalizeAttendance(items) {
@@ -261,6 +261,16 @@
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  function normalizeParticipationHistory(items) {
+    const byDate = new Map();
+    asArray(items).forEach((entry) => {
+      const date = text(entry?.date);
+      const level = Number(entry?.level);
+      if (validDate(date) && [1, 2, 3, 4].includes(level)) byDate.set(date, { date, level });
+    });
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   function normalizeStudentRecord(record) {
     const source = isObject(record) ? record : {};
     const participation = Number(source.participation);
@@ -268,6 +278,7 @@
       ...source,
       attendance: normalizeAttendance(source.attendance),
       participation: [1, 2, 3, 4].includes(participation) ? participation : null,
+      participationHistory: normalizeParticipationHistory(source.participationHistory),
       notes: asArray(source.notes).filter(isObject).map((note) => ({
         ...note,
         id: text(note.id) || makeId('note'),
@@ -586,10 +597,35 @@
     return threshold;
   }
 
-  function setParticipation(courseName, studentName, level) {
+  function participationLevel(record, date) {
+    return asArray(record?.participationHistory).find((entry) => entry.date === date)?.level || null;
+  }
+
+  function participationSummary(record) {
+    const history = asArray(record?.participationHistory);
+    if (history.length) {
+      const average = history.reduce((total, entry) => total + entry.level, 0) / history.length;
+      return `${average.toFixed(1)} avg · ${history.length} day${history.length === 1 ? '' : 's'}`;
+    }
+    return record?.participation ? `L${record.participation} prior` : '—';
+  }
+
+  function setParticipation(courseName, studentName, date, level) {
+    if (!findCourse(courseName) || !activeStudents(courseName).includes(studentName) || !validDate(date) || ![1, 2, 3, 4].includes(level)) return;
     const record = ensureRecord(courseName, studentName);
-    record.participation = record.participation === level ? null : level;
-    save('Participation saved');
+    record.participationHistory = normalizeParticipationHistory(record.participationHistory);
+    const index = record.participationHistory.findIndex((entry) => entry.date === date);
+    if (index >= 0 && record.participationHistory[index].level === level) {
+      record.participationHistory.splice(index, 1);
+      save('Daily participation cleared');
+    } else if (index >= 0) {
+      record.participationHistory[index].level = level;
+      save('Daily participation saved');
+    } else {
+      record.participationHistory.push({ date, level });
+      record.participationHistory = normalizeParticipationHistory(record.participationHistory);
+      save('Daily participation saved');
+    }
   }
 
   function assignmentStats(courseName, assignment) {
@@ -712,8 +748,8 @@
     return `<div class="status-group">${ATTENDANCE_CODES.map((code) => `<button type="button" class="status-button ${status === code ? 'active' : ''}" data-action="${action}" data-course="${escapeAttr(courseName)}" data-student="${escapeAttr(studentName)}" data-date="${date}" data-status="${code}" title="${ATTENDANCE_LABELS[code]}">${code}</button>`).join('')}</div>`;
   }
 
-  function participationButtons(courseName, studentName, currentLevel) {
-    return `<div class="status-group">${[1, 2, 3, 4].map((level) => `<button type="button" class="level-button ${currentLevel === level ? 'active' : ''}" data-action="set-participation" data-course="${escapeAttr(courseName)}" data-student="${escapeAttr(studentName)}" data-level="${level}" title="Participation level ${level}">${level}</button>`).join('')}</div>`;
+  function participationButtons(courseName, studentName, date, currentLevel) {
+    return `<div class="status-group">${[1, 2, 3, 4].map((level) => `<button type="button" class="level-button ${currentLevel === level ? 'active' : ''}" data-action="set-participation" data-course="${escapeAttr(courseName)}" data-student="${escapeAttr(studentName)}" data-date="${date}" data-level="${level}" title="Participation level ${level} for ${escapeAttr(formatShortDate(date))}">${level}</button>`).join('')}</div>`;
   }
 
   function renderQuickRoster() {
@@ -725,6 +761,7 @@
       byId('quickRoster').innerHTML = '<tbody><tr><td class="empty-copy">Restore a backup or add an active class to begin.</td></tr></tbody>';
       return;
     }
+    const canMarkParticipation = isSchoolDay(ui.selectedDate);
     const rows = course.students.map((student, index) => {
       const record = ensureRecord(course.name, student);
       const status = attendanceStatus(course.name, student, ui.selectedDate);
@@ -733,12 +770,12 @@
         <td>${index + 1}</td>
         <td><strong>${escapeHtml(student)}</strong></td>
         <td>${attendanceButtons(course.name, student, ui.selectedDate, status, 'quick-attendance')}</td>
-        <td>${participationButtons(course.name, student, record.participation)}</td>
+        <td>${canMarkParticipation ? participationButtons(course.name, student, ui.selectedDate, participationLevel(record, ui.selectedDate)) : '—'}</td>
         <td>${openItems ? `<span class="chip warning">${openItems} open</span>` : '—'}</td>
         <td>${countAbsences(record) || '—'}</td>
       </tr>`;
     }).join('');
-    byId('quickRoster').innerHTML = `<thead><tr><th>#</th><th>Student</th><th>Attendance</th><th>Participation</th><th>Work</th><th>A + E</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster yet.</td></tr>'}</tbody>`;
+    byId('quickRoster').innerHTML = `<thead><tr><th>#</th><th>Student</th><th>Attendance</th><th>Participation<br><small>${escapeHtml(formatShortDate(ui.selectedDate))}</small></th><th>Work</th><th>A + E</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster yet.</td></tr>'}</tbody>`;
   }
 
   function renderThresholdSummary() {
@@ -841,7 +878,8 @@
     const rows = course.students.map((student, index) => {
       const record = ensureRecord(courseName, student);
       const status = attendanceStatus(courseName, student, ui.selectedDate);
-      return `<tr><td>${index + 1}</td><td><strong>${escapeHtml(student)}</strong></td><td>${canEdit ? attendanceButtons(courseName, student, ui.selectedDate, status, 'attendance-status') : (status || '—')}</td><td>${countAbsences(record)}</td><td>${record.participation || '—'}</td></tr>`;
+      const participation = participationLevel(record, ui.selectedDate);
+      return `<tr><td>${index + 1}</td><td><strong>${escapeHtml(student)}</strong></td><td>${canEdit ? attendanceButtons(courseName, student, ui.selectedDate, status, 'attendance-status') : (status || '—')}</td><td>${countAbsences(record)}</td><td>${canEdit ? participationButtons(courseName, student, ui.selectedDate, participation) : (participation ? `L${participation}` : '—')}</td></tr>`;
     }).join('');
     byId('attendanceDayTable').innerHTML = `<thead><tr><th>#</th><th>Student</th><th>Status</th><th>A + E</th><th>Participation</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No students are on this active roster yet.</td></tr>'}</tbody>`;
 
@@ -937,9 +975,9 @@
       const record = ensureRecord(courseName, student);
       const missing = allMissingItems(courseName).filter((item) => item.student === student).length;
       const submitted = allAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[student]).submitted).length;
-      return `<tr><td><strong>${escapeHtml(student)}</strong></td><td>${countAbsences(record)}</td><td>${record.participation || '—'}</td><td>${submitted}/${allAssignments.length}</td><td>${missing}</td><td>${record.notes.length}</td></tr>`;
+      return `<tr><td><strong>${escapeHtml(student)}</strong></td><td>${countAbsences(record)}</td><td>${participationSummary(record)}</td><td>${submitted}/${allAssignments.length}</td><td>${missing}</td><td>${record.notes.length}</td></tr>`;
     }).join('');
-    byId('reportTable').innerHTML = `<thead><tr><th>Student</th><th>A + E</th><th>Participation</th><th>Submitted</th><th>Open work</th><th>Notes</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster.</td></tr>'}</tbody>`;
+    byId('reportTable').innerHTML = `<thead><tr><th>Student</th><th>A + E</th><th>Participation average</th><th>Submitted</th><th>Open work</th><th>Notes</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster.</td></tr>'}</tbody>`;
   }
 
   function renderManage() {
@@ -1418,7 +1456,7 @@
         if (threshold) showThresholdAlert(target.dataset.student, threshold);
         break;
       }
-      case 'set-participation': setParticipation(target.dataset.course, target.dataset.student, Number(target.dataset.level)); renderAll(); break;
+      case 'set-participation': setParticipation(target.dataset.course, target.dataset.student, target.dataset.date, Number(target.dataset.level)); renderAll(); break;
       case 'attendance-today': ui.selectedDate = todayISO(); ui.selectedMonth = monthISO(); renderAll(); break;
       case 'open-attendance-picker': showAttendancePicker(target.dataset.course, target.dataset.student, target.dataset.date); break;
       case 'picker-set-status': {
