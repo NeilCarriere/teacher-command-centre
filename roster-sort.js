@@ -46,9 +46,7 @@
       if (sortList(course?.students)) changed = true;
     });
 
-    if (changed) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
+    if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     return changed;
   }
 
@@ -60,7 +58,6 @@
     }, 0);
   }
 
-  // Keep imported / older rosters tidy as well as newly added students.
   const sortedOnLoad = sortStoredRosters();
   if (sortedOnLoad && sessionStorage.getItem(RELOAD_GUARD) !== '1') {
     sessionStorage.setItem(RELOAD_GUARD, '1');
@@ -69,14 +66,21 @@
   }
   sessionStorage.removeItem(RELOAD_GUARD);
 
-  // app.js saves the new student synchronously when this form submits.
-  // Sort immediately afterwards so the student appears in surname order everywhere.
   const studentForm = document.getElementById('studentForm');
   if (studentForm) studentForm.addEventListener('submit', sortThenRefresh);
 
-  // A renamed student may move to a different alphabetical position too.
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('[data-action="rename-student"]');
     if (button) sortThenRefresh();
   });
+
+  // Tests & Quizzes is intentionally kept in its own small module so the proven
+  // attendance/assignment engine remains untouched. Load it after the main app.
+  if (!document.querySelector('script[data-assessments-module]')) {
+    const script = document.createElement('script');
+    script.src = `assessments.js?v=1`;
+    script.defer = true;
+    script.dataset.assessmentsModule = '1';
+    document.head.appendChild(script);
+  }
 })();
