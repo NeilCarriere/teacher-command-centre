@@ -22,6 +22,7 @@
         <button type="button" class="nav-button active" data-view="dashboard">⌂ Home</button>
         <button type="button" class="nav-button" data-view="attendance">✓ Attendance</button>
         <button type="button" class="nav-button" data-view="assignments">▤ Assignments</button>
+        <button type="button" class="nav-button" data-view="assessments">★ Tests &amp; Quizzes</button>
         <button type="button" class="nav-button" data-view="notes">✎ Student Notes</button>
         <button type="button" class="nav-button" data-view="reports">▥ Reports</button>
         <button type="button" class="nav-button" data-view="manage">⚙ Manage Classes</button>
@@ -172,6 +173,7 @@
             <div>
               <p class="panel-kicker">TRACK · REVIEW · FOLLOW UP</p>
               <h2>Assignment Tracker</h2>
+              <p class="panel-help">Each assignment includes an Assigned date and a Due date. Use the calendar field when you create or edit it.</p>
             </div>
             <button type="button" class="secondary-button" data-action="show-add-assignment">＋ Add Assignment</button>
           </div>
@@ -179,6 +181,23 @@
           <div id="assignmentSummary" class="assignment-summary"></div>
           <div id="assignmentList" class="assignment-list"></div>
           <div id="assignmentDetail" class="assignment-detail"></div>
+        </section>
+      </section>
+
+      <section id="assessmentsView" class="view hidden">
+        <section class="panel">
+          <div class="panel-heading split-heading">
+            <div>
+              <p class="panel-kicker">TESTS · QUIZZES · RESULTS</p>
+              <h2>Tests &amp; Quizzes</h2>
+              <p class="panel-help">Track scheduled assessments and student results without adding future tests to the missing-work list.</p>
+            </div>
+            <button type="button" class="secondary-button" data-action="show-add-assessment">＋ Add Test / Quiz</button>
+          </div>
+          <div id="assessmentCourseTabs" class="course-tabs"></div>
+          <div id="assessmentSummary" class="assignment-summary"></div>
+          <div id="assessmentList" class="assignment-list"></div>
+          <div id="assessmentDetail" class="assignment-detail"></div>
         </section>
       </section>
 
@@ -267,7 +286,7 @@
   <input id="restoreFile" type="file" accept="application/json,.json,text/plain" hidden>
   <div id="modalRoot" aria-live="polite"></div>
 
-  <script src="app.js?v=18" defer></script>
+  <script src="app.js?v=19" defer></script>
   <script src="roster-sort.js?v=1" defer></script>
 </body>
 </html>
