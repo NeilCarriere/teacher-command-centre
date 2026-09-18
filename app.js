@@ -814,21 +814,21 @@
   }
 
   function renderHistory() {
-    const fallback = CANADIAN_HISTORY[`${new Date().getMonth() + 1}-${new Date().getDate()}`] || null;
-    const item = historyItem || fallback || {
-      year: '',
-      title: 'A day worth investigating',
-      text: 'A Canadian history item will appear here when the live history source is available.',
-      trivia: 'This card avoids defaulting to a U.S. event simply because it is prominent in a feed.',
-      source: 'Canadian-first history card'
-    };
-    byId('historyDate').textContent = `TODAY IN HISTORY — ${formatDate(todayISO(), { month: 'long', day: 'numeric' }).toUpperCase()}`;
-    byId('historyTitle').textContent = `${item.year ? `${item.year} — ` : ''}${item.title}`;
+    const card = document.querySelector('.history-card');
+    const key = (new Date().getMonth() + 1) + '-' + new Date().getDate();
+    const fallback = CANADIAN_HISTORY[key] ? { ...CANADIAN_HISTORY[key], source: 'Built-in Canadian history entry.' } : null;
+    const item = historyItem || fallback;
+    if (!item) {
+      card?.classList.add('hidden');
+      return;
+    }
+    card?.classList.remove('hidden');
+    byId('historyDate').textContent = 'TODAY IN HISTORY — ' + formatDate(todayISO(), { month: 'long', day: 'numeric' }).toUpperCase();
+    byId('historyTitle').textContent = (item.year ? item.year + ' — ' : '') + item.title;
     byId('historyText').textContent = item.text;
-    byId('historyTrivia').textContent = `💡 Trivia: ${item.trivia}`;
-    byId('historySource').textContent = item.source || 'Canadian-first daily history selection.';
+    byId('historyTrivia').textContent = '💡 Trivia: ' + item.trivia;
+    byId('historySource').textContent = item.source || 'Canadian history source.';
   }
-
   function renderDashboard() {
     renderCommandStrip();
     renderClassCards();
@@ -1431,14 +1431,16 @@
   }
 
   function isCanadaText(value) {
-    return /\b(canada|canadian|ontario|quebec|manitoba|saskatchewan|alberta|british columbia|newfoundland|nova scotia|new brunswick|pei|prince edward|nunavut|yukon|northwest territories|ottawa|toronto|montreal|vancouver|winnipeg|halifax|indigenous|first nations|inuit|métis)\b/i.test(value);
+    return /\b(canada|canadian|ontario|quebec|manitoba|saskatchewan|alberta|british columbia|newfoundland|nova scotia|new brunswick|pei|prince edward island|nunavut|yukon|northwest territories|ottawa|toronto|montreal|vancouver|winnipeg|halifax|gander|acadia|upper canada|lower canada|dominion of canada|new france)\b/i.test(value);
+  }
+  function isCanadianHistoryEvent(event) {
+    const page = event.pages?.[0] || {};
+    const value = [event.text, page.description, page.extract, page.title].filter(Boolean).join(' ');
+    return isCanadaText(value);
   }
 
   function historyScore(event) {
-    const page = event.pages?.[0] || {};
-    const value = `${event.text || ''} ${page.description || ''} ${page.extract || ''} ${page.title || ''}`;
-    let score = isCanadaText(value) ? 100 : 0;
-    if (/world war|armistice|independence|revolution|invasion|declaration|earthquake|tsunami|moon landing|nuclear|attack/i.test(value)) score += 20;
+    let score = isCanadianHistoryEvent(event) ? 100 : 0;
     if (Number(event.year) >= 1800) score += 4;
     return score;
   }
@@ -1447,27 +1449,31 @@
     const now = new Date();
     const month = now.getMonth() + 1;
     const day = now.getDate();
+    const key = month + '-' + day;
+    const fallback = CANADIAN_HISTORY[key] ? { ...CANADIAN_HISTORY[key], source: 'Built-in Canadian history entry.' } : null;
     try {
-      const response = await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`, { cache: 'no-store' });
+      const response = await fetch('https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/' + month + '/' + day, { cache: 'no-store' });
       if (!response.ok) throw new Error('History source unavailable');
       const data = await response.json();
-      const events = asArray(data.events).map((event) => ({ ...event, score: historyScore(event) })).sort((a, b) => b.score - a.score);
-      const chosen = events.find((event) => event.score >= 100) || events[0];
-      if (!chosen) throw new Error('No history event returned');
+      const events = asArray(data.events)
+        .filter(isCanadianHistoryEvent)
+        .map((event) => ({ ...event, score: historyScore(event) }))
+        .sort((a, b) => b.score - a.score);
+      const chosen = events[0];
+      if (!chosen) throw new Error('No Canadian history event returned');
       const page = chosen.pages?.[0] || {};
       historyItem = {
         year: text(chosen.year),
         title: text(page.normalizedtitle || page.title || chosen.year).replaceAll('_', ' '),
         text: text(chosen.text || page.extract),
-        trivia: text(page.description) || 'A date on the calendar can hold a surprisingly large story.',
-        source: chosen.score >= 100 ? 'Live daily event with Canadian relevance prioritized.' : 'Live daily event; no stronger Canadian event was available in this feed.'
+        trivia: text(page.description) || 'A Canadian date on the calendar can hold a surprisingly large story.',
+        source: 'Live Canadian history event.'
       };
     } catch (_) {
-      historyItem = CANADIAN_HISTORY[`${month}-${day}`] ? { ...CANADIAN_HISTORY[`${month}-${day}`], source: 'Built-in Canadian history fallback.' } : null;
+      historyItem = fallback;
     }
     renderHistory();
   }
-
   function handleClick(event) {
     if (event.target.id === 'modalBackdrop') {
       closeModal();
