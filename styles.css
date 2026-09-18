@@ -94,7 +94,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .brand {
-  font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif;
+  font-family: "Trebuchet MS", Arial, sans-serif;
   line-height: 1.04;
   letter-spacing: .1px;
 }
@@ -150,7 +150,7 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
   margin-top: auto;
   padding: 22px 7px 0;
   color: #d8e2da;
-  font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif;
+  font-family: "Trebuchet MS", Arial, sans-serif;
   font-size: 13px;
   font-style: normal;
   line-height: 1.35;
@@ -191,7 +191,7 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
 
 .app-header h1, .panel h2, .panel h3, .reminder-note h2, .reminder-note h3 {
   margin: 0;
-  font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif;
+  font-family: "Trebuchet MS", Arial, sans-serif;
   font-weight: 800;
   text-shadow: .6px .7px 0 rgba(255,255,255,.16), -1px 1px 0 rgba(0,0,0,.15);
 }
@@ -208,7 +208,7 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
   min-width: 156px;
   padding: 10px 0;
   color: #dbe7df;
-  font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif;
+  font-family: "Trebuchet MS", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.3;
   text-align: right;
@@ -279,7 +279,7 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
 
 .mug-quote { display: flex; align-items: center; gap: 13px; }
 .mug { font-size: 41px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.25)); }
-.quote-copy { position: relative; z-index: 1; font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif; font-size: 15px; line-height: 1.29; }
+.quote-copy { position: relative; z-index: 1; font-family: "Trebuchet MS", Arial, sans-serif; font-size: 15px; line-height: 1.29; }
 .quote-copy strong { display: block; margin-top: 5px; color: var(--yellow); font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 11px; letter-spacing: .3px; }
 
 .word-card {
@@ -303,13 +303,13 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
 }
 
 .word-card::before { top: -8px; left: 50%; transform: translateX(-50%); }
-.word-card .label { display: inline-block; margin-bottom: 7px; border-bottom: 2px solid rgba(195,70,55,.65); font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif; font-size: 13px; font-weight: 900; }
-.word-card .word { font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif; font-size: 20px; font-weight: 900; line-height: 1.05; }
+.word-card .label { display: inline-block; margin-bottom: 7px; border-bottom: 2px solid rgba(195,70,55,.65); font-family: "Trebuchet MS", Arial, sans-serif; font-size: 13px; font-weight: 900; }
+.word-card .word { font-family: "Trebuchet MS", Arial, sans-serif; font-size: 20px; font-weight: 900; line-height: 1.05; }
 .word-card .definition { margin-top: 6px; font-size: 12px; line-height: 1.32; }
 
 .date-card { display: flex; flex-direction: column; justify-content: space-between; }
 .date-icon { font-size: 28px; }
-.daily-thought { position: relative; z-index: 1; font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif; font-size: 13px; line-height: 1.28; }
+.daily-thought { position: relative; z-index: 1; font-family: "Trebuchet MS", Arial, sans-serif; font-size: 13px; line-height: 1.28; }
 .doodle-line { height: 3px; margin-top: 8px; border-radius: 999px; opacity: .75; background: linear-gradient(90deg, var(--blue), var(--green), transparent); }
 
 .class-cards {
@@ -644,7 +644,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   background: var(--panel);
   box-shadow: 0 20px 60px rgba(0,0,0,.52);
 }
-.modal h2 { margin: 0 0 7px; font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif; font-size: 24px; }
+.modal h2 { margin: 0 0 7px; font-family: "Trebuchet MS", Arial, sans-serif; font-size: 24px; }
 .modal p { color: var(--muted); font-size: 13px; line-height: 1.42; }
 .modal-form { display: grid; gap: 12px; margin-top: 15px; }
 .modal-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 800; }
@@ -702,4 +702,132 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   .assignment-actions { justify-content: flex-start; }
   .status-group { gap: 3px; }
   .data-table th, .data-table td { padding: 7px 5px; }
+}
+
+
+/* Dashboard order and working-surface emphasis */
+.dashboard-reminders { margin-bottom: 14px; }
+.dashboard-reminders .inline-form { max-width: 640px; }
+.dashboard-reminders .reminder-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.dashboard-history { margin-bottom: 15px; }
+.dashboard-footer-cards { margin-top: 15px; margin-bottom: 0; }
+.class-cards { gap: 12px; }
+.class-card { min-height: 96px; padding: 11px 12px; }
+
+/* Student report cards and profiles */
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+.report-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-height: 112px;
+  padding: 12px;
+  color: var(--chalk);
+  border: 1px solid var(--faint);
+  border-radius: 10px;
+  background: rgba(0,0,0,.10);
+  text-align: left;
+  cursor: pointer;
+}
+.report-card:hover, .report-card.active {
+  border-color: rgba(99,214,139,.68);
+  background: rgba(99,214,139,.09);
+}
+.report-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.report-card-heading strong { font-size: 15px; }
+.report-card-heading span { color: var(--muted); font-size: 11px; }
+.report-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.report-card-stat {
+  padding: 6px 5px;
+  border: 1px solid var(--faint);
+  border-radius: 7px;
+  text-align: center;
+}
+.report-card-stat strong { display: block; color: var(--yellow); font-size: 18px; }
+.report-card-stat span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.15; }
+.report-detail { margin-top: 15px; }
+.report-profile {
+  padding: 14px;
+  border: 1px solid rgba(99,214,139,.32);
+  border-radius: 11px;
+  background: rgba(0,0,0,.10);
+}
+.report-profile-heading { margin-bottom: 12px; }
+.report-profile-heading h3 { margin: 0; font-size: 22px; }
+.report-profile-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.report-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.report-summary-item {
+  padding: 9px 7px;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  text-align: center;
+}
+.report-summary-item strong { display: block; font-size: 20px; }
+.report-summary-item span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.2; }
+.report-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.report-section {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--faint);
+  border-radius: 9px;
+  background: rgba(0,0,0,.08);
+}
+.report-section h4 { margin: 0 0 8px; color: var(--chalk); font-size: 15px; }
+.report-section .notes-list { margin-top: 0; }
+.report-assignment-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.report-assignment {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--faint);
+  border-radius: 7px;
+  background: rgba(255,255,255,.025);
+}
+.report-assignment strong { display: block; font-size: 13px; }
+.report-assignment small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.report-assignment .chip { flex: 0 0 auto; }
+.note-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.note-actions .mini-button { font-size: 11px; }
+
+/* Printed chalk: readable block lettering rather than cursive handwriting */
+.brand, .sidebar-footer, .app-header h1, .panel h2, .panel h3, .reminder-note h2,
+.reminder-note h3, .header-date, .quote-copy, .word-card .label, .word-card .word,
+.daily-thought, .modal h2 {
+  font-family: "Trebuchet MS", Arial, sans-serif;
+  letter-spacing: .1px;
+}
+
+@media (max-width: 800px) {
+  .report-profile-grid { grid-template-columns: 1fr; }
+  .dashboard-reminders .reminder-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .report-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
