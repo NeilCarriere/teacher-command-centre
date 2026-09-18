@@ -73,14 +73,4 @@
     const button = event.target.closest?.('[data-action="rename-student"]');
     if (button) sortThenRefresh();
   });
-
-  // Tests & Quizzes is intentionally kept in its own small module so the proven
-  // attendance/assignment engine remains untouched. Load it after the main app.
-  if (!document.querySelector('script[data-assessments-module]')) {
-    const script = document.createElement('script');
-    script.src = `assessments.js?v=1`;
-    script.defer = true;
-    script.dataset.assessmentsModule = '1';
-    document.head.appendChild(script);
-  }
 })();
