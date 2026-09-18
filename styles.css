@@ -831,3 +831,21 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 @media (max-width: 520px) {
   .report-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Open student reports immediately in a readable modal */
+.report-modal {
+  width: min(1000px, 96vw);
+}
+.report-modal .report-profile {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.report-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
