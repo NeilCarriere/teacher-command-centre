@@ -189,7 +189,7 @@ button:active { transform: translateY(1px) scale(.985); filter: brightness(1.12)
   text-transform: uppercase;
 }
 
-.app-header h1, .panel h2, .panel h3, .canada-note h2, .canada-note h3 {
+.app-header h1, .panel h2, .panel h3, .reminder-note h2, .reminder-note h3 {
   margin: 0;
   font-family: "Chalkboard SE", "Chalkboard", "Trebuchet MS", system-ui, sans-serif;
   font-weight: 800;
@@ -445,7 +445,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .trivia { margin: 12px 0 0; padding: 9px 10px; color: #fff4bf; border-left: 3px solid var(--yellow); border-radius: 5px; background: rgba(246,211,101,.065); font-size: 12px; line-height: 1.4; }
 .card-source { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 
-.canada-note {
+.reminder-note {
   position: relative;
   margin-bottom: 15px;
   padding: 16px 16px 14px;
@@ -458,9 +458,24 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 }
 .note-pin { top: -8px; left: 50%; transform: translateX(-50%); }
 .note-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.canada-note h2 { padding-bottom: 3px; border-bottom: 2px solid rgba(195,70,55,.55); font-size: 17px; }
-.canada-note h3 { margin: 5px 0 6px; font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 14px; line-height: 1.25; }
-.canada-note p { margin: 0; font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 12.5px; line-height: 1.42; }
+.reminder-note h2 { padding-bottom: 3px; border-bottom: 2px solid rgba(195,70,55,.55); font-size: 17px; }
+.reminder-note h3 { margin: 5px 0 6px; font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 14px; line-height: 1.25; }
+
+.reminder-note .panel-kicker { color: #8a5b14; }
+.reminder-note .inline-form { margin-top: 12px; }
+.reminder-note .inline-form input {
+  color: #20251f;
+  border-color: rgba(80,70,20,.35);
+  background: rgba(255,255,255,.24);
+}
+.reminder-note .reminder-list { margin-top: 10px; }
+.reminder-note .reminder-item {
+  border-color: rgba(80,70,20,.22);
+  background: rgba(255,255,255,.22);
+}
+.reminder-note .small-icon { color: #5b4c20; }
+.reminder-note .empty-copy { color: #6a5b2b; }
+.reminder-note p { margin: 0; font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 12.5px; line-height: 1.42; }
 .note-date { margin-top: 6px !important; opacity: .67; font-size: 11px !important; }
 .news-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px !important; }
 .news-links a { padding: 5px 8px; color: #153e55; border: 1px solid rgba(21,62,85,.28); border-radius: 999px; background: rgba(255,255,255,.25); font-size: 11px; font-weight: 800; text-decoration: none; }
@@ -665,7 +680,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   .header-date { padding: 0; text-align: left; }
   .command-strip { grid-template-columns: 1fr; }
   .command-strip .welcome-card { grid-column: auto; }
-  .word-card, .canada-note { transform: none; }
+  .word-card, .reminder-note { transform: none; }
   .threshold-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .modal-row { grid-template-columns: 1fr; }
 }
