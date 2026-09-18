@@ -156,7 +156,6 @@
   let state;
   let migratedLegacyData = false;
   let pendingImport = null;
-  let canadaNews = null;
   let historyItem = null;
   const ui = {
     view: 'dashboard',
@@ -825,19 +824,6 @@
     byId('historySource').textContent = item.source || 'Canadian-first daily history selection.';
   }
 
-  function renderCanadaNews() {
-    const dateLabel = formatDate(todayISO(), { month: 'short', day: 'numeric', year: 'numeric' });
-    const item = canadaNews || {
-      title: 'Finding a Canadian headline…',
-      summary: 'This card will use a current Canadian news source when the connection is available.',
-      links: []
-    };
-    byId('canadaNewsDate').textContent = dateLabel;
-    byId('canadaNewsTitle').textContent = item.title;
-    byId('canadaNewsSummary').textContent = item.summary;
-    byId('canadaNewsLinks').innerHTML = (item.links || []).map((link) => `<a href="${escapeAttr(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)} →</a>`).join('');
-  }
-
   function renderDashboard() {
     renderCommandStrip();
     renderClassCards();
@@ -846,7 +832,6 @@
     renderMissingSummary();
     renderReminders();
     renderHistory();
-    renderCanadaNews();
   }
 
   function courseOptions(selected, includeArchived = false) {
@@ -1336,108 +1321,6 @@
     renderHistory();
   }
 
-  function cleanFeedText(value) {
-    const element = document.createElement('div');
-    element.innerHTML = String(value || '');
-    return (element.textContent || element.innerText || '').replace(/\s+/g, ' ').trim();
-  }
-
-  function truncate(value, length) {
-    const clean = cleanFeedText(value);
-    return clean.length > length ? `${clean.slice(0, length - 1).replace(/\s+\S*$/, '')}…` : clean;
-  }
-
-  function fallbackCanadaNews() {
-    return {
-      title: 'Current Canadian news is one tap away',
-      summary: 'The live headline could not be reached just now, so this card will not pretend an old story is today’s news. These links open current Canadian coverage directly.',
-      links: [
-        { label: 'CBC Canada', href: 'https://www.cbc.ca/news/canada' },
-        { label: 'Global Canada', href: 'https://globalnews.ca/canada/' }
-      ]
-    };
-  }
-
-  function parseCanadaFeed(xmlText) {
-    const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
-    const item = xml.querySelector('item');
-    if (!item) return null;
-    const title = cleanFeedText(item.querySelector('title')?.textContent || '');
-    const description = cleanFeedText(item.querySelector('description')?.textContent || '');
-    const link = cleanFeedText(item.querySelector('link')?.textContent || '');
-    if (!title) return null;
-    return {
-      title,
-      summary: truncate(description, 290) || 'A leading Canadian story from CBC News.',
-      links: [
-        { label: 'Read on CBC', href: link || 'https://www.cbc.ca/news/canada' },
-        { label: 'More Canada news', href: 'https://globalnews.ca/canada/' }
-      ]
-    };
-  }
-
-  async function loadCanadaNews(force = false) {
-    const cacheKey = `teacher_command_centre_canada_news_${todayISO()}`;
-    if (!force) {
-      const cached = readLocal(cacheKey, null);
-      if (isObject(cached) && text(cached.title)) {
-        canadaNews = cached;
-        renderCanadaNews();
-        return;
-      }
-    }
-    canadaNews = {
-      title: 'Finding a Canadian headline…',
-      summary: 'Checking a current Canadian news feed.',
-      links: []
-    };
-    renderCanadaNews();
-    const feed = 'https://www.cbc.ca/cmlink/rss-canada';
-    const sources = [
-      feed,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(feed)}`,
-      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed)}`
-    ];
-    try {
-      for (const source of sources) {
-        try {
-          const response = await fetch(source, { cache: 'no-store' });
-          if (!response.ok) continue;
-          const body = await response.text();
-          let item = null;
-          if (source.includes('rss2json.com')) {
-            const parsed = safeParse(body, null);
-            const first = parsed?.items?.[0];
-            if (first?.title) {
-              item = {
-                title: cleanFeedText(first.title),
-                summary: truncate(first.description || first.content || '', 290) || 'A leading Canadian story from CBC News.',
-                links: [
-                  { label: 'Read on CBC', href: text(first.link) || 'https://www.cbc.ca/news/canada' },
-                  { label: 'More Canada news', href: 'https://globalnews.ca/canada/' }
-                ]
-              };
-            }
-          } else {
-            item = parseCanadaFeed(body);
-          }
-          if (item) {
-            canadaNews = item;
-            writeLocal(cacheKey, canadaNews);
-            renderCanadaNews();
-            return;
-          }
-        } catch (_) {
-          // Try the next public feed route without interrupting the dashboard.
-        }
-      }
-      throw new Error('No Canadian feed route available');
-    } catch (_) {
-      canadaNews = fallbackCanadaNews();
-      renderCanadaNews();
-    }
-  }
-
   function handleClick(event) {
     if (event.target.id === 'modalBackdrop') {
       closeModal();
@@ -1506,7 +1389,6 @@
         }
         break;
       }
-      case 'refresh-news': loadCanadaNews(true); break;
       case 'download-backup': downloadBackup(); break;
       case 'open-import': byId('restoreFile').value = ''; byId('restoreFile').click(); break;
       case 'copy-backup': copyBackup(); break;
@@ -1673,7 +1555,6 @@
     byId('restoreFile').addEventListener('change', handleRestoreFile);
     renderAll();
     loadHistory();
-    loadCanadaNews();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
