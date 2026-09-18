@@ -620,7 +620,8 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .backup-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0 10px; }
 .backup-status { min-height: 20px; margin: 0 0 10px; color: var(--green); font-size: 13px; }
 .backup-label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
-#backupPayload { min-height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.38; }
+#backupPayload, #restorePayload { min-height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.38; }
+.backup-restore-actions { margin-top: 9px; }
 .privacy-note { margin: 11px 0 0; color: #fff1bd; font-size: 12px; line-height: 1.42; }
 
 .modal-backdrop {
