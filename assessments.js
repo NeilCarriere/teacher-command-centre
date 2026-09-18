@@ -91,6 +91,20 @@
     showModal(`<h2>${editing?'Edit':'Add'} Test / Quiz</h2><form id="assessmentForm" class="modal-form"><label>Class<select name="course">${courses().map(c=>`<option ${c.name===courseName?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Name<input name="name" required value="${attr(a?.name||'')}" placeholder="e.g. Municipal Elections Quiz"></label><div class="modal-row"><label>Type<select name="type"><option ${a?.type==='Test'?'selected':''}>Test</option><option ${a?.type==='Quiz'?'selected':''}>Quiz</option></select></label><label>Date<input type="date" name="date" required value="${attr(a?.date||today())}"></label></div><label>Maximum mark<input type="number" name="maxMark" min="1" value="${Number(a?.maxMark)||100}" required></label>${editing?`<input type="hidden" name="id" value="${attr(a.id)}">`:''}<div class="modal-actions"><button type="button" class="secondary-button" data-assessment-close>Cancel</button><button type="submit" class="primary-button">${editing?'Save Changes':'Add Test / Quiz'}</button></div></form>`);
   }
 
+  function cloneData(value) {
+    try { return JSON.parse(JSON.stringify(value)); } catch (_) { return { classes: {} }; }
+  }
+
+  window.teacherCommandCentreAssessments = {
+    exportData: () => cloneData(data),
+    importData: (incoming) => {
+      data = incoming && typeof incoming === 'object' ? cloneData(incoming) : { classes: {} };
+      data.classes ||= {};
+      save('Tests & quizzes restored');
+      render();
+    }
+  };
+
   document.addEventListener('click', (e) => {
     const editItem = e.target.closest?.('[data-assessment-edit-id]');
     if (editItem) {
