@@ -475,6 +475,40 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .threshold.t15 strong, .threshold.t20 strong { color: var(--red); }
 
 .compact-list, .reminder-list, .manage-list, .assignment-list, .notes-list { display: grid; gap: 8px; }
+.assessment-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--faint);
+  border-radius: 9px;
+  background: rgba(0,0,0,.08);
+}
+.assessment-list-item.active {
+  border-color: rgba(99,214,139,.62);
+  background: rgba(99,214,139,.08);
+}
+.assessment-list-item.archived { opacity: .62; }
+.assessment-select {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  color: var(--chalk);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.assessment-select strong { font-size: 14px; }
+.assessment-select span { color: var(--muted); font-size: 11px; }
+.assessment-select:hover strong { color: var(--yellow); }
+.assessment-edit-button {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
 .compact-item, .reminder-item, .manage-row, .assignment-card, .note-item {
   border: 1px solid var(--faint);
   border-radius: 9px;
