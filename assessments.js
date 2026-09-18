@@ -72,7 +72,7 @@
     const active = assessments.filter(a => !a.archived);
     const upcoming = active.filter(a => validDate(a.date) && a.date >= today()).length;
     byId('assessmentSummary').innerHTML = `<div class="summary-card"><strong>${active.length}</strong><span>Active tests / quizzes</span></div><div class="summary-card"><strong>${upcoming}</strong><span>Upcoming</span></div><div class="summary-card"><strong>${roster(courseName).length}</strong><span>Students</span></div>`;
-    byId('assessmentList').innerHTML = assessments.length ? assessments.map(a => `<button type="button" class="assignment-item ${a.id===selectedId?'active':''} ${a.archived?'archived':''}" data-assessment-id="${attr(a.id)}"><strong>${esc(a.name)}</strong><span>${esc(a.type || 'Test')} · ${fmt(a.date)} · /${Number(a.maxMark)||100}</span></button>`).join('') : `<div class="empty-state"><h3>No tests or quizzes yet</h3><p>Add one when you are ready.</p></div>`;
+    byId('assessmentList').innerHTML = assessments.length ? assessments.map(a => `<div class="assessment-list-item ${a.id===selectedId?'active':''} ${a.archived?'archived':''}"><button type="button" class="assessment-select" data-assessment-id="${attr(a.id)}" aria-label="Open ${attr(a.name)}"><strong>${esc(a.name)}</strong><span>${esc(a.type || 'Test')} · ${fmt(a.date)} · /${Number(a.maxMark)||100}</span></button><button type="button" class="secondary-button assessment-edit-button" data-assessment-edit-id="${attr(a.id)}" aria-label="Edit ${attr(a.name)}">Edit</button></div>`).join('') : `<div class="empty-state"><h3>No tests or quizzes yet</h3><p>Add one when you are ready.</p></div>`;
     renderDetail();
   }
 
@@ -92,6 +92,16 @@
   }
 
   document.addEventListener('click', (e) => {
+    const editItem = e.target.closest?.('[data-assessment-edit-id]');
+    if (editItem) {
+      const assessment = bucket(courseName).find((item) => item.id === editItem.dataset.assessmentEditId);
+      if (assessment) {
+        selectedId = assessment.id;
+        render();
+        addForm(assessment);
+      }
+      return;
+    }
     const course = e.target.closest('[data-assessment-course]');
     if (course) { courseName=course.dataset.assessmentCourse; selectedId=''; render(); return; }
     const item = e.target.closest('[data-assessment-id]');
