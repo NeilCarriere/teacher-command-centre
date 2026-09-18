@@ -157,6 +157,7 @@
   let migratedLegacyData = false;
   let pendingImport = null;
   let historyItem = null;
+  let reportProfileMarkup = '';
   const ui = {
     view: 'dashboard',
     selectedDate: todayISO(),
@@ -952,6 +953,7 @@
     const detail = byId('reportDetail');
     byId('reportCourse').innerHTML = courseOptions(courseName);
     if (!course) {
+      reportProfileMarkup = '';
       byId('reportMetrics').innerHTML = '';
       if (cards) cards.innerHTML = '<p class="empty-copy">No active class is available.</p>';
       if (detail) detail.innerHTML = '';
@@ -979,6 +981,7 @@
     }
 
     if (!detail || !selectedStudent) {
+      reportProfileMarkup = '';
       if (detail) detail.innerHTML = '';
       return;
     }
@@ -1000,8 +1003,18 @@
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    detail.innerHTML = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + allAssignments.length + ' current assignments submitted</p></div><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + allAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    if (detail) detail.innerHTML = '';
   }
+
+
+  function openReportProfile(courseName, studentName) {
+    ui.reportCourse = courseName;
+    ui.reportStudent = studentName;
+    renderAll();
+    if (reportProfileMarkup) showModal(reportProfileMarkup, 'report-modal');
+  }
+
 
   function renderManage() {
     byId('manageCourse').innerHTML = courseOptions(ui.manageCourse);
@@ -1525,11 +1538,7 @@
         }
         break;
       }
-      case 'open-report-student':
-        ui.reportCourse = target.dataset.course;
-        ui.reportStudent = target.dataset.student;
-        renderAll();
-        break;
+      case 'open-report-student': openReportProfile(target.dataset.course, target.dataset.student); break;
       case 'report-add-note': showAddNote(ui.reportCourse, ui.reportStudent); break;
       case 'delete-reminder': {
         const reminder = state.reminders.find((item) => item.id === target.dataset.reminderId);
