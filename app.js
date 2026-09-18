@@ -542,7 +542,8 @@
         studentData: state.studentData
       },
       assignmentTracker: state.assignmentTracker,
-      reminders: state.reminders
+      reminders: state.reminders,
+      assessments: window.teacherCommandCentreAssessments?.exportData?.()
     };
   }
 
@@ -1073,11 +1074,12 @@
         courses: app.courses || null,
         studentData,
         assignmentTracker: parsed.assignmentTracker || { classes: {} },
-        reminders: Array.isArray(parsed.reminders) ? parsed.reminders : []
+        reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
+        assessments: isObject(parsed.assessments) ? parsed.assessments : null
       };
     }
     if (isObject(parsed.students)) {
-      return { currentClass: parsed.currentClass || '', courses: null, studentData: parsed, assignmentTracker: { classes: {} }, reminders: [] };
+      return { currentClass: parsed.currentClass || '', courses: null, studentData: parsed, assignmentTracker: { classes: {} }, reminders: [], assessments: null };
     }
     throw new Error('I could not find Teacher Command Centre data in that file.');
   }
@@ -1086,7 +1088,9 @@
     const normalized = normalizeState(data);
     const counts = countRecords(normalized);
     const assignments = Object.values(normalized.assignmentTracker.classes).reduce((total, item) => total + asArray(item.assignments).length, 0);
-    return `${normalized.courses.courses.length} classes · ${counts.students} student records · ${counts.attendance} attendance entries · ${assignments} assignments · ${normalized.reminders.length} reminders`;
+    const assessmentClasses = isObject(data.assessments?.classes) ? data.assessments.classes : {};
+    const assessments = Object.values(assessmentClasses).reduce((total, item) => total + asArray(item?.assessments).length, 0);
+    return `${normalized.courses.courses.length} classes · ${counts.students} student records · ${counts.attendance} attendance entries · ${assignments} assignments · ${assessments} tests/quizzes · ${normalized.reminders.length} reminders`;
   }
 
   function countRecords(targetState) {
@@ -1103,19 +1107,25 @@
     const extracted = extractBackup(parsed);
     const summary = backupSummary(extracted);
     pendingImport = extracted;
-    showModal(`<h2>Restore this backup?</h2><p>${escapeHtml(summary)}</p><p>This replaces the current v15 data on this device. A local pre-import recovery copy will be kept first.</p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="button" class="primary-button" data-action="confirm-import">Restore Backup</button></div>`);
+    showModal(`<h2>Restore this backup?</h2><p>${escapeHtml(summary)}</p><p>This replaces the current dashboard data on this device. A local pre-import recovery copy will be kept first.</p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="button" class="primary-button" data-action="confirm-import">Restore Backup</button></div>`);
   }
 
   function performImport() {
     if (!pendingImport) return;
+    const importedAssessments = pendingImport.assessments;
     writeLocal(PRE_IMPORT_KEY, state);
     state = normalizeState(pendingImport);
+    if (importedAssessments && window.teacherCommandCentreAssessments?.importData) {
+      window.teacherCommandCentreAssessments.importData(importedAssessments);
+    }
     migratedLegacyData = false;
     pendingImport = null;
     ensureSelections();
     save('Backup restored locally');
     closeModal();
-    byId('backupStatus').textContent = 'Backup restored successfully. The cleaned dashboard is now using that data.';
+    byId('backupStatus').textContent = 'Backup restored successfully. The dashboard is now using that data.';
+    const restoreBox = byId('restorePayload');
+    if (restoreBox) restoreBox.value = '';
     renderAll();
   }
 
@@ -1153,6 +1163,38 @@
     if (!copied) {
       box.focus();
       box.select();
+    }
+  }
+
+  function parsePastedBackup(raw) {
+    let value = text(raw);
+    const fence = String.fromCharCode(96).repeat(3);
+    value = value.replace(new RegExp('^' + fence + '(?:json)?\\s*', 'i'), '').replace(new RegExp('\\s*' + fence + '$', 'i'), '').trim();
+    if (!value) throw new Error('Paste the complete backup data into the box first.');
+    return JSON.parse(value);
+  }
+
+  function restorePastedBackup() {
+    const box = byId('restorePayload');
+    try {
+      previewImport(parsePastedBackup(box?.value || ''));
+    } catch (error) {
+      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
+      box?.focus();
+    }
+  }
+
+  async function pasteFromClipboard() {
+    const box = byId('restorePayload');
+    try {
+      const value = await navigator.clipboard.readText();
+      if (!value) throw new Error('The clipboard is empty.');
+      box.value = value;
+      box.focus();
+      byId('backupStatus').textContent = 'Backup pasted from the clipboard. Review it, then choose Restore Pasted Data.';
+    } catch (_) {
+      box?.focus();
+      byId('backupStatus').textContent = 'Clipboard access was blocked. Tap the box and paste the backup manually.';
     }
   }
 
@@ -1392,6 +1434,8 @@
       case 'download-backup': downloadBackup(); break;
       case 'open-import': byId('restoreFile').value = ''; byId('restoreFile').click(); break;
       case 'copy-backup': copyBackup(); break;
+      case 'paste-clipboard': pasteFromClipboard(); break;
+      case 'restore-pasted': restorePastedBackup(); break;
       case 'confirm-import': performImport(); break;
       case 'rename-course': renameCourse(target.dataset.course); renderAll(); break;
       case 'archive-course': toggleCourseArchive(target.dataset.course); renderAll(); break;
