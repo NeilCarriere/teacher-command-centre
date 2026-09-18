@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 17;
+  const APP_VERSION = 18;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -167,6 +167,7 @@
     notesCourse: '',
     notesStudent: '',
     reportCourse: '',
+    reportStudent: '',
     manageCourse: ''
   };
 
@@ -513,6 +514,8 @@
       if (!available.includes(ui[key])) ui[key] = state.currentClass;
     });
     if (!activeStudents(ui.notesCourse).includes(ui.notesStudent)) ui.notesStudent = activeStudents(ui.notesCourse)[0] || '';
+    const reportRoster = activeStudents(ui.reportCourse);
+    if (!reportRoster.includes(ui.reportStudent)) ui.reportStudent = reportRoster[0] || '';
     const selectedExists = findAssignment(ui.assignmentCourse, ui.selectedAssignmentId);
     if (!selectedExists) {
       ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.archived)?.id || assignmentsFor(ui.assignmentCourse)[0]?.id || '';
@@ -709,7 +712,7 @@
     const thought = DAILY_THOUGHTS[(index + 5) % DAILY_THOUGHTS.length];
     byId('commandStrip').innerHTML = `
       <section class="command-card welcome-card">
-        <div class="mug-quote"><div class="mug" aria-hidden="true">☕</div><p class="quote-copy">“${escapeHtml(quote)}”<strong>— Daily teaching thought</strong></p></div>
+        <div class="mug-quote"><div class="mug" aria-hidden="true">☕</div><p class="quote-copy">“${escapeHtml(quote)}”<strong>— Quote of the Day</strong></p></div>
       </section>
       <section class="command-card word-card">
         <div class="label">Word of the Day</div>
@@ -933,41 +936,71 @@
     host.innerHTML = `<section class="detail-panel"><h3>${escapeHtml(assignment.name)}</h3><p class="assignment-meta">Current active roster only. Historical student entries remain in the data but are not re-added to this class.</p><div class="detail-controls"><label><input type="checkbox" data-assignment-toggle="participationEvidence" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.participationEvidence ? 'checked' : ''}> Participation evidence</label><label><input type="checkbox" data-assignment-toggle="formativeClasswork" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.formativeClasswork ? 'checked' : ''}> Formative classroom work</label></div><div class="table-wrap"><table class="data-table detail-table"><thead><tr><th>Student</th><th>Submitted</th><th>N/A</th><th>Achievement</th><th>Note</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No active students are on this roster.</td></tr>'}</tbody></table></div></section>`;
   }
 
+
   function renderNotes() {
     const courseName = ui.notesCourse;
     const students = activeStudents(courseName);
     byId('notesCourse').innerHTML = courseOptions(courseName);
-    byId('notesStudent').innerHTML = students.map((student) => `<option value="${escapeAttr(student)}" ${student === ui.notesStudent ? 'selected' : ''}>${escapeHtml(student)}</option>`).join('');
-    if (!courseName || !ui.notesStudent) {
-      byId('notesList').innerHTML = '<p class="empty-copy">Choose an active class and student to review notes.</p>';
-      return;
-    }
-    const record = ensureRecord(courseName, ui.notesStudent);
-    const notes = [...record.notes].sort((a, b) => `${b.date}${b.id}`.localeCompare(`${a.date}${a.id}`));
-    byId('notesList').innerHTML = notes.length ? notes.map((note) => `<article class="note-item"><h3>${escapeHtml(note.category || 'Observation')}</h3><p>${escapeHtml(note.text)}</p><p class="note-meta">${escapeHtml(formatShortDate(note.date))}</p></article>`).join('') : '<p class="empty-copy">No notes for this student yet.</p>';
+    byId('notesStudent').innerHTML = students.map((student) => '<option value="' + escapeAttr(student) + '" ' + (student === ui.notesStudent ? 'selected' : '') + '>' + escapeHtml(student) + '</option>').join('');
+    byId('notesList').innerHTML = renderNoteList(courseName, ui.notesStudent, 'Choose an active class and student to review notes.');
   }
 
   function renderReports() {
     const courseName = ui.reportCourse;
     const course = findCourse(courseName);
+    const cards = byId('reportCards');
+    const detail = byId('reportDetail');
     byId('reportCourse').innerHTML = courseOptions(courseName);
     if (!course) {
       byId('reportMetrics').innerHTML = '';
-      byId('reportTable').innerHTML = '<tbody><tr><td class="empty-copy">No active class is available.</td></tr></tbody>';
+      if (cards) cards.innerHTML = '<p class="empty-copy">No active class is available.</p>';
+      if (detail) detail.innerHTML = '';
       return;
     }
+
     const allAssignments = assignmentsFor(courseName).filter((assignment) => !assignment.archived);
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
-    byId('reportMetrics').innerHTML = `<div class="metric"><strong>${course.students.length}</strong><span>Active students</span></div><div class="metric"><strong>${attendanceTotal}</strong><span>Total A + E</span></div><div class="metric"><strong>${missingTotal}</strong><span>Open work items</span></div><div class="metric"><strong>${notesTotal}</strong><span>Notes</span></div>`;
-    const rows = course.students.map((student) => {
-      const record = ensureRecord(courseName, student);
-      const missing = allMissingItems(courseName).filter((item) => item.student === student).length;
-      const submitted = allAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[student]).submitted).length;
-      return `<tr><td><strong>${escapeHtml(student)}</strong></td><td>${countAbsences(record)}</td><td>${participationSummary(record)}</td><td>${submitted}/${allAssignments.length}</td><td>${missing}</td><td>${record.notes.length}</td></tr>`;
-    }).join('');
-    byId('reportTable').innerHTML = `<thead><tr><th>Student</th><th>A + E</th><th>Participation average</th><th>Submitted</th><th>Open work</th><th>Notes</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster.</td></tr>'}</tbody>`;
+    byId('reportMetrics').innerHTML = '<div class="metric"><strong>' + course.students.length + '</strong><span>Active students</span></div><div class="metric"><strong>' + attendanceTotal + '</strong><span>Total A + E</span></div><div class="metric"><strong>' + missingTotal + '</strong><span>Open work items</span></div><div class="metric"><strong>' + notesTotal + '</strong><span>Notes</span></div>';
+
+    const selectedStudent = course.students.includes(ui.reportStudent) ? ui.reportStudent : (course.students[0] || '');
+    ui.reportStudent = selectedStudent;
+    if (cards) {
+      cards.innerHTML = course.students.length ? course.students.map((student) => {
+        const record = ensureRecord(courseName, student);
+        const open = allAssignments.filter((assignment) => {
+          const row = normalizeSubmission(assignment.students?.[student]);
+          return !row.submitted && !row.notRequired;
+        }).length + asArray(record.missing).filter((item) => item.active !== false).length;
+        const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
+        return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
+      }).join('') : '<p class="empty-copy">No students are on this active roster.</p>';
+    }
+
+    if (!detail || !selectedStudent) {
+      if (detail) detail.innerHTML = '';
+      return;
+    }
+
+    const record = ensureRecord(courseName, selectedStudent);
+    const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
+    const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
+    const assignmentRows = allAssignments.map((assignment) => {
+      const row = normalizeSubmission(assignment.students?.[selectedStudent]);
+      const status = row.notRequired ? 'N/A' : row.submitted ? 'Complete' : (assignment.due && assignment.due < todayISO() ? 'Overdue' : 'Missing');
+      const statusClass = status === 'Complete' || status === 'N/A' ? 'success' : 'warning';
+      const due = assignment.due ? 'Due ' + formatShortDate(assignment.due) : 'No due date';
+      return '<li class="report-assignment"><span><strong>' + escapeHtml(assignment.name) + '</strong><small>' + escapeHtml(due) + '</small></span><span class="chip ' + statusClass + '">' + status + '</span></li>';
+    });
+    const assignmentItems = [...missingLegacy, ...assignmentRows].join('');
+    const submitted = allAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[selectedStudent]).submitted).length;
+    const outstanding = allAssignments.filter((assignment) => {
+      const row = normalizeSubmission(assignment.students?.[selectedStudent]);
+      return !row.submitted && !row.notRequired;
+    }).length + missingLegacy.length;
+
+    detail.innerHTML = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + allAssignments.length + ' current assignments submitted</p></div><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
   }
 
   function renderManage() {
@@ -1020,6 +1053,7 @@
     ui.reportCourse = courseName;
     ui.manageCourse = courseName;
     ui.notesStudent = activeStudents(courseName)[0] || '';
+    ui.reportStudent = activeStudents(courseName)[0] || '';
     ui.selectedAssignmentId = assignmentsFor(courseName).find((assignment) => !assignment.archived)?.id || assignmentsFor(courseName)[0]?.id || '';
     save(saveMessage);
   }
@@ -1049,18 +1083,52 @@
 
   function showAddAssignment(courseName = ui.assignmentCourse) {
     if (!findCourse(courseName)) return;
-    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${todayISO()}" required></label><label>Due<input type="date" name="due"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
+    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${todayISO()}" required></label><label>Due date<input type="date" name="due" aria-label="Assignment due date" title="Choose the due date from the calendar"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
   }
 
   function showEditAssignment(courseName, assignmentId) {
     const assignment = findAssignment(courseName, assignmentId);
     if (!assignment) return;
-    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${assignment.assigned}"></label><label>Due<input type="date" name="due" value="${assignment.due}"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
+    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${assignment.assigned}"></label><label>Due date<input type="date" name="due" value="${assignment.due}" aria-label="Assignment due date" title="Choose the due date from the calendar"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
   }
 
   function showAddNote(courseName = ui.notesCourse, studentName = ui.notesStudent) {
     if (!findCourse(courseName)) return;
     showModal(`<h2>Add Student Note</h2><p>Capture concise, factual evidence that will still make sense later.</p><form id="noteForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Student<select name="student">${activeStudents(courseName).map((student) => `<option value="${escapeAttr(student)}" ${student === studentName ? 'selected' : ''}>${escapeHtml(student)}</option>`).join('')}</select></label><div class="modal-row"><label>Category<select name="category"><option>Observation</option><option>Participation</option><option>Attendance</option><option>Follow-up</option><option>Support</option></select></label><label>Date<input type="date" name="date" value="${todayISO()}"></label></div><label>Note<textarea name="text" required placeholder="Observation, participation evidence, follow-up note…"></textarea></label><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Note</button></div></form>`);
+  }
+
+
+  function findNote(courseName, studentName, noteId) {
+    return ensureRecord(courseName, studentName).notes.find((note) => note.id === noteId) || null;
+  }
+
+  function showEditNote(courseName, studentName, noteId) {
+    const note = findNote(courseName, studentName, noteId);
+    if (!note) return;
+    const categories = ['Observation', 'Participation', 'Attendance', 'Follow-up', 'Support'];
+    const options = categories.map((category) => '<option value="' + escapeAttr(category) + '" ' + (note.category === category ? 'selected' : '') + '>' + escapeHtml(category) + '</option>').join('');
+    showModal([
+      '<h2>Edit Student Note</h2>',
+      '<p>Keep the wording factual and useful when you return to it later.</p>',
+      '<form id="noteEditForm" class="modal-form">',
+      '<input type="hidden" name="course" value="' + escapeAttr(courseName) + '">',
+      '<input type="hidden" name="student" value="' + escapeAttr(studentName) + '">',
+      '<input type="hidden" name="noteId" value="' + escapeAttr(note.id) + '">',
+      '<div class="modal-row"><label>Category<select name="category">' + options + '</select></label><label>Date<input type="date" name="date" value="' + escapeAttr(note.date) + '"></label></div>',
+      '<label>Note<textarea name="text" required>' + escapeHtml(note.text) + '</textarea></label>',
+      '<div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div>',
+      '</form>'
+    ].join(''));
+  }
+
+  function noteMarkup(courseName, studentName, note) {
+    return '<article class="note-item"><h3>' + escapeHtml(note.category || 'Observation') + '</h3><p>' + escapeHtml(note.text) + '</p><p class="note-meta">' + escapeHtml(formatShortDate(note.date)) + '</p><div class="note-actions"><button type="button" class="mini-button" data-action="edit-note" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(studentName) + '" data-note-id="' + escapeAttr(note.id) + '">Edit</button><button type="button" class="mini-button" data-action="delete-note" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(studentName) + '" data-note-id="' + escapeAttr(note.id) + '">Delete</button></div></article>';
+  }
+
+  function renderNoteList(courseName, studentName, emptyText) {
+    if (!courseName || !studentName) return '<p class="empty-copy">' + escapeHtml(emptyText || 'Choose an active class and student to review notes.') + '</p>';
+    const notes = [...ensureRecord(courseName, studentName).notes].sort((a, b) => (b.date + b.id).localeCompare(a.date + a.id));
+    return notes.length ? notes.map((note) => noteMarkup(courseName, studentName, note)).join('') : '<p class="empty-copy">' + escapeHtml(emptyText || 'No notes for this student yet.') + '</p>';
   }
 
   function extractBackup(parsed) {
@@ -1195,6 +1263,30 @@
     } catch (_) {
       box?.focus();
       byId('backupStatus').textContent = 'Clipboard access was blocked. Tap the box and paste the backup manually.';
+    }
+  }
+
+
+  async function pasteAndPreviewBackup() {
+    const box = byId('restorePayload');
+    let value = '';
+    try {
+      value = await navigator.clipboard.readText();
+    } catch (_) {
+      box?.focus();
+      byId('backupStatus').textContent = 'Clipboard access was blocked. Paste the backup into the box manually, then choose Restore Pasted Data.';
+      return;
+    }
+    if (!value) {
+      byId('backupStatus').textContent = 'The clipboard is empty.';
+      return;
+    }
+    if (box) box.value = value;
+    try {
+      previewImport(parsePastedBackup(value));
+    } catch (error) {
+      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
+      box?.focus();
     }
   }
 
@@ -1422,6 +1514,23 @@
         break;
       }
       case 'show-add-note': showAddNote(); break;
+      case 'edit-note': showEditNote(target.dataset.course, target.dataset.student, target.dataset.noteId); break;
+      case 'delete-note': {
+        const record = ensureRecord(target.dataset.course, target.dataset.student);
+        const note = findNote(target.dataset.course, target.dataset.student, target.dataset.noteId);
+        if (note && window.confirm('Delete this student note?')) {
+          record.notes = record.notes.filter((item) => item.id !== note.id);
+          save('Student note deleted');
+          renderAll();
+        }
+        break;
+      }
+      case 'open-report-student':
+        ui.reportCourse = target.dataset.course;
+        ui.reportStudent = target.dataset.student;
+        renderAll();
+        break;
+      case 'report-add-note': showAddNote(ui.reportCourse, ui.reportStudent); break;
       case 'delete-reminder': {
         const reminder = state.reminders.find((item) => item.id === target.dataset.reminderId);
         if (reminder && window.confirm(`Delete reminder: ${reminder.text}?`)) {
@@ -1435,6 +1544,7 @@
       case 'open-import': byId('restoreFile').value = ''; byId('restoreFile').click(); break;
       case 'copy-backup': copyBackup(); break;
       case 'paste-clipboard': pasteFromClipboard(); break;
+      case 'paste-preview': pasteAndPreviewBackup(); break;
       case 'restore-pasted': restorePastedBackup(); break;
       case 'confirm-import': performImport(); break;
       case 'rename-course': renameCourse(target.dataset.course); renderAll(); break;
@@ -1470,6 +1580,7 @@
       renderAll();
     } else if (target.id === 'reportCourse') {
       ui.reportCourse = target.value;
+      ui.reportStudent = activeStudents(ui.reportCourse)[0] || '';
       renderAll();
     } else if (target.id === 'manageCourse') {
       ui.manageCourse = target.value;
@@ -1560,6 +1671,22 @@
         ui.notesCourse = courseName;
         ui.notesStudent = studentName;
         save('Student note saved');
+        closeModal();
+        renderAll();
+      } else if (form.id === 'noteEditForm') {
+        const courseName = text(data.get('course'));
+        const studentName = text(data.get('student'));
+        const note = findNote(courseName, studentName, text(data.get('noteId')));
+        const noteText = text(data.get('text'));
+        if (!note || !findCourse(courseName) || !activeStudents(courseName).includes(studentName) || !noteText) throw new Error('Choose an active student and enter a note.');
+        note.text = noteText;
+        note.date = validDate(data.get('date')) ? data.get('date') : todayISO();
+        note.category = text(data.get('category')) || 'Observation';
+        ui.notesCourse = courseName;
+        ui.notesStudent = studentName;
+        ui.reportCourse = courseName;
+        ui.reportStudent = studentName;
+        save('Student note updated');
         closeModal();
         renderAll();
       }
