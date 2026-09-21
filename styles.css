@@ -849,3 +849,17 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   justify-content: flex-end;
   gap: 8px;
 }
+
+
+/* v25: slightly dusty printed-chalk treatment */
+.brand, .app-header h1, .panel h2, .panel h3, .reminder-note h2, .reminder-note h3,
+.nav-button, .panel-kicker, .eyebrow, .class-card h2, .command-card .word, .quote-copy {
+  text-shadow:
+    0.45px 0.35px 0 rgba(255,255,255,.18),
+    -0.55px 0.25px 0 rgba(243,240,223,.10),
+    0 0 1.2px rgba(243,240,223,.22),
+    1px 1px 0 rgba(0,0,0,.16);
+}
+.panel h2, .panel h3, .app-header h1, .class-card h2 {
+  letter-spacing: .015em;
+}
