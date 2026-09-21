@@ -1201,12 +1201,15 @@
     migratedLegacyData = false;
     pendingImport = null;
     ensureSelections();
-    save('Backup restored locally');
+    const saved = save('Backup restored locally');
+    if (!saved) throw new Error('The browser could not save the restored backup locally.');
     closeModal();
     const restoreBox = byId('restorePayload');
     if (restoreBox) restoreBox.value = '';
     ui.view = 'dashboard';
     renderAll();
+    const status = byId('saveStatus');
+    if (status) status.textContent = '✓ Backup restored — latest pasted data is active';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1255,8 +1258,12 @@
   function restorePastedBackup() {
     const box = byId('restorePayload');
     try {
-      previewImport(parsePastedBackup(box?.value || ''));
+      const parsed = parsePastedBackup(box?.value || '');
+      pendingImport = extractBackup(parsed);
+      // Restore immediately: the button itself is the user's restore confirmation.
+      performImport();
     } catch (error) {
+      pendingImport = null;
       byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
       box?.focus();
     }
@@ -1427,48 +1434,12 @@
     save('Assignment details saved');
   }
 
-  function isCanadaText(value) {
-    return /\b(canada|canadian|ontario|quebec|manitoba|saskatchewan|alberta|british columbia|newfoundland|nova scotia|new brunswick|pei|prince edward island|nunavut|yukon|northwest territories|ottawa|toronto|montreal|vancouver|winnipeg|halifax|gander|acadia|upper canada|lower canada|dominion of canada|new france)\b/i.test(value);
-  }
-  function isCanadianHistoryEvent(event) {
-    const page = event.pages?.[0] || {};
-    const value = [event.text, page.description, page.extract, page.title].filter(Boolean).join(' ');
-    return isCanadaText(value);
-  }
-
-  function historyScore(event) {
-    let score = isCanadianHistoryEvent(event) ? 100 : 0;
-    if (Number(event.year) >= 1800) score += 4;
-    return score;
-  }
-
   async function loadHistory() {
     const now = new Date();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
-    const key = month + '-' + day;
-    const fallback = CANADIAN_HISTORY[key] ? { ...CANADIAN_HISTORY[key], source: 'Built-in Canadian history entry.' } : null;
-    try {
-      const response = await fetch('https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/' + month + '/' + day, { cache: 'no-store' });
-      if (!response.ok) throw new Error('History source unavailable');
-      const data = await response.json();
-      const events = asArray(data.events)
-        .filter(isCanadianHistoryEvent)
-        .map((event) => ({ ...event, score: historyScore(event) }))
-        .sort((a, b) => b.score - a.score);
-      const chosen = events[0];
-      if (!chosen) throw new Error('No Canadian history event returned');
-      const page = chosen.pages?.[0] || {};
-      historyItem = {
-        year: text(chosen.year),
-        title: text(page.normalizedtitle || page.title || chosen.year).replaceAll('_', ' '),
-        text: text(chosen.text || page.extract),
-        trivia: text(page.description) || 'A Canadian date on the calendar can hold a surprisingly large story.',
-        source: 'Live Canadian history event.'
-      };
-    } catch (_) {
-      historyItem = fallback;
-    }
+    const key = (now.getMonth() + 1) + '-' + now.getDate();
+    historyItem = CANADIAN_HISTORY[key]
+      ? { ...CANADIAN_HISTORY[key], source: 'Curated Canadian history entry.' }
+      : null;
     renderHistory();
   }
   function handleClick(event) {
