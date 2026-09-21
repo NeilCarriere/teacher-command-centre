@@ -53,6 +53,11 @@
       title: 'Reports',
       subtitle: 'Attendance, participation, notes, and assignment follow-through in one place.'
     },
+    assessments: {
+      eyebrow: 'TRACK · REVIEW · FOLLOW UP',
+      title: 'Tests & Quizzes',
+      subtitle: 'Keep tests and quizzes alongside the rest of your classroom records.'
+    },
     manage: {
       eyebrow: 'THE ACTIVE ROSTER DRIVES THE APP',
       title: 'Manage Classes',
