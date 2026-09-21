@@ -54,9 +54,9 @@
       subtitle: 'Attendance, participation, notes, and assignment follow-through in one place.'
     },
     assessments: {
-      eyebrow: 'TRACK · REVIEW · FOLLOW UP',
+      eyebrow: 'TESTS · QUIZZES · RESULTS',
       title: 'Tests & Quizzes',
-      subtitle: 'Keep tests and quizzes alongside the rest of your classroom records.'
+      subtitle: 'Schedule assessments and record student results in one place.'
     },
     manage: {
       eyebrow: 'THE ACTIVE ROSTER DRIVES THE APP',
@@ -1258,12 +1258,16 @@
   function parsePastedBackup(raw) {
     let value = text(raw);
     const fence = String.fromCharCode(96).repeat(3);
+
     if (value.startsWith(fence)) {
       value = value.slice(fence.length).trimStart();
       if (value.toLowerCase().startsWith('json')) value = value.slice(4).trimStart();
     }
     if (value.endsWith(fence)) value = value.slice(0, -fence.length).trimEnd();
+    value = value.trim();
+
     if (!value) throw new Error('Paste the complete backup data into the box first.');
+
     try {
       return JSON.parse(value);
     } catch (originalError) {
@@ -1273,7 +1277,9 @@
         const objectStart = value.lastIndexOf('{', markerIndex);
         const objectEnd = value.lastIndexOf('}');
         if (objectStart >= 0 && objectEnd > objectStart) {
-          try { return JSON.parse(value.slice(objectStart, objectEnd + 1)); } catch (_) {}
+          try {
+            return JSON.parse(value.slice(objectStart, objectEnd + 1));
+          } catch (_) {}
         }
       }
       throw originalError;
@@ -1285,485 +1291,9 @@
     try {
       const parsed = parsePastedBackup(box?.value || '');
       pendingImport = extractBackup(parsed);
-      // Restore immediately: the button itself is the user's restore confirmation.
       performImport();
     } catch (error) {
       pendingImport = null;
-      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
-      box?.focus();
-    }
-  }
-
-  async function pasteFromClipboard() {
-    const box = byId('restorePayload');
-    try {
-      const value = await navigator.clipboard.readText();
-      if (!value) throw new Error('The clipboard is empty.');
-      box.value = value;
-      box.focus();
-      byId('backupStatus').textContent = 'Backup pasted from the clipboard. Review it, then choose Restore Pasted Data.';
-    } catch (_) {
-      box?.focus();
-      byId('backupStatus').textContent = 'Clipboard access was blocked. Tap the box and paste the backup manually.';
-    }
-  }
-
-
-  async function pasteAndPreviewBackup() {
-    const box = byId('restorePayload');
-    let value = '';
-    try {
-      value = await navigator.clipboard.readText();
-    } catch (_) {
-      box?.focus();
-      byId('backupStatus').textContent = 'Clipboard access was blocked. Paste the backup into the box manually, then choose Restore Pasted Data.';
-      return;
-    }
-    if (!value) {
-      byId('backupStatus').textContent = 'The clipboard is empty.';
-      return;
-    }
-    if (box) box.value = value;
-    try {
-      previewImport(parsePastedBackup(value));
-    } catch (error) {
-      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
-      box?.focus();
-    }
-  }
-
-  function createCourse(courseName) {
-    const name = text(courseName);
-    if (!name) throw new Error('Enter a class name.');
-    if (asArray(state.courses.courses).some((course) => course.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('A class with that name already exists.');
-    state.courses.courses.push({ name, archived: false, students: [] });
-    state.studentData.students[name] = {};
-    state.assignmentTracker.classes[name] = { assignments: [] };
-    setCurrentClass(name, 'Class added');
-  }
-
-  function renameCourse(oldName) {
-    const course = findCourse(oldName);
-    if (!course) return;
-    const next = text(window.prompt('Rename class:', oldName));
-    if (!next || next === oldName) return;
-    if (asArray(state.courses.courses).some((item) => item.name !== oldName && item.name.toLocaleLowerCase() === next.toLocaleLowerCase())) {
-      window.alert('A class with that name already exists.');
-      return;
-    }
-    course.name = next;
-    if (state.studentData.students[oldName]) {
-      state.studentData.students[next] = state.studentData.students[oldName];
-      delete state.studentData.students[oldName];
-    }
-    if (state.assignmentTracker.classes[oldName]) {
-      state.assignmentTracker.classes[next] = state.assignmentTracker.classes[oldName];
-      delete state.assignmentTracker.classes[oldName];
-    }
-    Object.keys(ui).forEach((key) => { if (ui[key] === oldName) ui[key] = next; });
-    if (state.currentClass === oldName) state.currentClass = next;
-    save('Class renamed');
-  }
-
-  function toggleCourseArchive(courseName) {
-    const course = findCourse(courseName);
-    if (!course) return;
-    if (!course.archived && activeCourses().length <= 1) {
-      window.alert('Keep at least one active class. Add or restore another class first.');
-      return;
-    }
-    const action = course.archived ? 'restore' : 'archive';
-    if (!window.confirm(`${action[0].toUpperCase()}${action.slice(1)} ${course.name}? Historical records are kept either way.`)) return;
-    course.archived = !course.archived;
-    ensureSelections();
-    save(`Class ${course.archived ? 'archived' : 'restored'}`);
-  }
-
-  function addStudent(courseName, studentName) {
-    const course = findCourse(courseName);
-    const name = text(studentName);
-    if (!course || course.archived) throw new Error('Choose an active class first.');
-    if (!name) throw new Error('Enter a student display name.');
-    if (course.students.some((student) => student.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('That student is already in this active roster.');
-    course.students.push(name);
-    ensureRecord(courseName, name);
-    assignmentsFor(courseName).forEach((assignment) => {
-      if (!assignment.students[name]) assignment.students[name] = normalizeSubmission({});
-    });
-    ui.manageCourse = courseName;
-    save('Student added');
-  }
-
-  function renameStudent(courseName, oldName) {
-    const course = findCourse(courseName);
-    if (!course || !course.students.includes(oldName)) return;
-    const next = text(window.prompt('Rename student:', oldName));
-    if (!next || next === oldName) return;
-    if (course.students.some((student) => student !== oldName && student.toLocaleLowerCase() === next.toLocaleLowerCase())) {
-      window.alert('That name is already in this active roster.');
-      return;
-    }
-    course.students = course.students.map((student) => student === oldName ? next : student);
-    const records = state.studentData.students[courseName] || {};
-    if (records[oldName]) {
-      records[next] = records[oldName];
-      delete records[oldName];
-    }
-    assignmentsFor(courseName).forEach((assignment) => {
-      if (assignment.students[oldName]) {
-        assignment.students[next] = assignment.students[oldName];
-        delete assignment.students[oldName];
-      }
-    });
-    if (ui.notesStudent === oldName && ui.notesCourse === courseName) ui.notesStudent = next;
-    save('Student renamed');
-  }
-
-  function removeStudentFromRoster(courseName, studentName) {
-    const course = findCourse(courseName);
-    if (!course || !course.students.includes(studentName)) return;
-    const message = `Remove ${studentName} from ${courseName}? This permanently clears their attendance, participation, notes, and assignment records for this class. A previous backup is the only way to restore them.`;
-    if (!window.confirm(message)) return;
-    course.students = course.students.filter((student) => student !== studentName);
-    const records = state.studentData.students[courseName];
-    if (records) delete records[studentName];
-    assignmentsFor(courseName).forEach((assignment) => {
-      delete assignment.students[studentName];
-    });
-    if (ui.notesCourse === courseName && ui.notesStudent === studentName) ui.notesStudent = '';
-    ensureSelections();
-    save('Student and related records removed');
-  }
-
-  function updateAssignmentSubmission(target) {
-    const courseName = target.dataset.course;
-    const assignment = findAssignment(courseName, target.dataset.assignmentId);
-    const studentName = target.dataset.student;
-    if (!assignment || !studentName) return;
-    if (!assignment.students[studentName]) assignment.students[studentName] = normalizeSubmission({});
-    const row = assignment.students[studentName];
-    const field = target.dataset.assignmentField;
-    if (field === 'submitted' || field === 'notRequired') row[field] = target.checked;
-    else if (field === 'mark') {
-      row.mark = target.value;
-      row.achievement = target.value;
-      if (text(target.value)) row.submitted = true;
-    } else if (field === 'note') row.note = target.value;
-    save('Assignment status saved');
-  }
-
-  function updateAssignmentToggle(target) {
-    const assignment = findAssignment(target.dataset.course, target.dataset.assignmentId);
-    if (!assignment) return;
-    assignment[target.dataset.assignmentToggle] = target.checked;
-    save('Assignment details saved');
-  }
-
-  async function loadHistory() {
-    const now = new Date();
-    const key = (now.getMonth() + 1) + '-' + now.getDate();
-    historyItem = CANADIAN_HISTORY[key]
-      ? { ...CANADIAN_HISTORY[key], source: 'Curated Canadian history entry.' }
-      : null;
-    renderHistory();
-  }
-  function handleClick(event) {
-    if (event.target.id === 'modalBackdrop') {
-      closeModal();
-      return;
-    }
-    const viewButton = event.target.closest('[data-view]');
-    if (viewButton) {
-      event.preventDefault();
-      showView(viewButton.dataset.view);
-      return;
-    }
-    const target = event.target.closest('[data-action]');
-    if (!target) return;
-    const action = target.dataset.action;
-    if (action === 'toggle-reminder') return;
-    event.preventDefault();
-    switch (action) {
-      case 'close-modal': closeModal(); break;
-      case 'open-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
-      case 'open-attendance-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
-      case 'open-assignments-course': setCurrentClass(target.dataset.course); showView('assignments'); break;
-      case 'open-notes-course': setCurrentClass(target.dataset.course); showView('notes'); break;
-      case 'quick-attendance':
-      case 'attendance-status': {
-        const threshold = setAttendance(target.dataset.course, target.dataset.student, target.dataset.date, target.dataset.status);
-        renderAll();
-        if (threshold) showThresholdAlert(target.dataset.student, threshold);
-        break;
-      }
-      case 'set-participation': setParticipation(target.dataset.course, target.dataset.student, target.dataset.date, Number(target.dataset.level)); renderAll(); break;
-      case 'attendance-today': ui.selectedDate = todayISO(); ui.selectedMonth = monthISO(); renderAll(); break;
-      case 'open-attendance-picker': showAttendancePicker(target.dataset.course, target.dataset.student, target.dataset.date); break;
-      case 'picker-set-status': {
-        const threshold = setAttendance(target.dataset.course, target.dataset.student, target.dataset.date, target.dataset.status);
-        closeModal();
-        renderAll();
-        if (threshold) showThresholdAlert(target.dataset.student, threshold);
-        break;
-      }
-      case 'select-assignment-course':
-        ui.assignmentCourse = target.dataset.course;
-        state.currentClass = ui.assignmentCourse;
-        ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.archived)?.id || assignmentsFor(ui.assignmentCourse)[0]?.id || '';
-        save('Class selection saved');
-        renderAll();
-        break;
-      case 'show-add-assignment': showAddAssignment(); break;
-      case 'open-assignment': ui.assignmentCourse = target.dataset.course; ui.selectedAssignmentId = target.dataset.assignmentId; renderAll(); break;
-      case 'edit-assignment': showEditAssignment(target.dataset.course, target.dataset.assignmentId); break;
-      case 'archive-assignment': {
-        const assignment = findAssignment(target.dataset.course, target.dataset.assignmentId);
-        if (assignment) {
-          assignment.archived = !assignment.archived;
-          save(`Assignment ${assignment.archived ? 'archived' : 'restored'}`);
-          renderAll();
-        }
-        break;
-      }
-      case 'show-add-note': showAddNote(); break;
-      case 'edit-note': showEditNote(target.dataset.course, target.dataset.student, target.dataset.noteId); break;
-      case 'delete-note': {
-        const record = ensureRecord(target.dataset.course, target.dataset.student);
-        const note = findNote(target.dataset.course, target.dataset.student, target.dataset.noteId);
-        if (note && window.confirm('Delete this student note?')) {
-          record.notes = record.notes.filter((item) => item.id !== note.id);
-          save('Student note deleted');
-          renderAll();
-        }
-        break;
-      }
-      case 'open-report-student': openReportProfile(target.dataset.course, target.dataset.student); break;
-      case 'report-add-note': showAddNote(ui.reportCourse, ui.reportStudent); break;
-      case 'delete-reminder': {
-        const reminder = state.reminders.find((item) => item.id === target.dataset.reminderId);
-        if (reminder && window.confirm(`Delete reminder: ${reminder.text}?`)) {
-          state.reminders = state.reminders.filter((item) => item.id !== reminder.id);
-          save('Reminder deleted');
-          renderAll();
-        }
-        break;
-      }
-      case 'download-backup': downloadBackup(); break;
-      case 'open-import': byId('restoreFile').value = ''; byId('restoreFile').click(); break;
-      case 'copy-backup': copyBackup(); break;
-      case 'paste-clipboard': pasteFromClipboard(); break;
-      case 'paste-preview': pasteAndPreviewBackup(); break;
-      case 'restore-pasted': restorePastedBackup(); break;
-      case 'confirm-import': performImport(); break;
-      case 'rename-course': renameCourse(target.dataset.course); renderAll(); break;
-      case 'archive-course': toggleCourseArchive(target.dataset.course); renderAll(); break;
-      case 'rename-student': renameStudent(target.dataset.course, target.dataset.student); renderAll(); break;
-      case 'remove-student': removeStudentFromRoster(target.dataset.course, target.dataset.student); renderAll(); break;
-      default: break;
-    }
-  }
-
-  function handleChange(event) {
-    const target = event.target;
-    if (target.id === 'quickDate') {
-      ui.selectedDate = target.value || todayISO();
-      ui.selectedMonth = monthISO(ui.selectedDate);
-      renderAll();
-    } else if (target.id === 'attendanceCourse') {
-      setCurrentClass(target.value);
-      renderAll();
-    } else if (target.id === 'attendanceDate') {
-      ui.selectedDate = target.value || todayISO();
-      ui.selectedMonth = monthISO(ui.selectedDate);
-      renderAll();
-    } else if (target.id === 'attendanceMonth') {
-      ui.selectedMonth = target.value || monthISO();
-      renderAll();
-    } else if (target.id === 'notesCourse') {
-      ui.notesCourse = target.value;
-      ui.notesStudent = activeStudents(ui.notesCourse)[0] || '';
-      renderAll();
-    } else if (target.id === 'notesStudent') {
-      ui.notesStudent = target.value;
-      renderAll();
-    } else if (target.id === 'reportCourse') {
-      ui.reportCourse = target.value;
-      ui.reportStudent = activeStudents(ui.reportCourse)[0] || '';
-      renderAll();
-    } else if (target.id === 'manageCourse') {
-      ui.manageCourse = target.value;
-      renderAll();
-    } else if (target.dataset.action === 'toggle-reminder') {
-      const reminder = state.reminders.find((item) => item.id === target.dataset.reminderId);
-      if (reminder) {
-        reminder.done = target.checked;
-        save('Reminder saved');
-        renderAll();
-      }
-    } else if (target.dataset.assignmentField) {
-      updateAssignmentSubmission(target);
-      renderAll();
-    } else if (target.dataset.assignmentToggle) {
-      updateAssignmentToggle(target);
-      renderAll();
-    }
-  }
-
-  function handleSubmit(event) {
-    const form = event.target;
-    if (!form.matches('form')) return;
-    event.preventDefault();
-    const data = new FormData(form);
-    try {
-      if (form.id === 'reminderForm') {
-        const reminderText = text(data.get('reminderText'));
-        if (!reminderText) return;
-        state.reminders.push({ id: makeId('reminder'), text: reminderText, done: false, createdAt: new Date().toISOString() });
-        form.reset();
-        save('Reminder saved');
-        renderAll();
-      } else if (form.id === 'courseForm') {
-        createCourse(data.get('courseName'));
-        form.reset();
-        renderAll();
-      } else if (form.id === 'studentForm') {
-        addStudent(ui.manageCourse, data.get('studentName'));
-        form.reset();
-        renderAll();
-      } else if (form.id === 'assignmentForm') {
-        const courseName = text(data.get('course'));
-        const course = findCourse(courseName);
-        const name = text(data.get('name'));
-        if (!course || !name) throw new Error('Enter an assignment name and active class.');
-        const assignment = normalizeAssignment({
-          id: makeId('assignment'),
-          name,
-          assigned: data.get('assigned'),
-          due: data.get('due'),
-          grading: data.get('grading'),
-          maxMark: data.get('maxMark'),
-          participationEvidence: data.get('participationEvidence') === 'on',
-          formativeClasswork: data.get('formativeClasswork') === 'on',
-          archived: false,
-          students: {}
-        }, course.students);
-        assignmentsFor(courseName).push(assignment);
-        ui.assignmentCourse = courseName;
-        state.currentClass = courseName;
-        ui.selectedAssignmentId = assignment.id;
-        save('Assignment added');
-        closeModal();
-        renderAll();
-      } else if (form.id === 'assignmentEditForm') {
-        const assignment = findAssignment(text(data.get('course')), text(data.get('assignmentId')));
-        if (!assignment) throw new Error('That assignment could not be found.');
-        assignment.name = text(data.get('name')) || assignment.name;
-        assignment.assigned = validDate(data.get('assigned')) ? data.get('assigned') : assignment.assigned;
-        assignment.due = validDate(data.get('due')) ? data.get('due') : '';
-        assignment.grading = text(data.get('grading')) || assignment.grading;
-        assignment.maxMark = Math.max(1, Number(data.get('maxMark')) || assignment.maxMark);
-        save('Assignment updated');
-        closeModal();
-        renderAll();
-      } else if (form.id === 'noteForm') {
-        const courseName = text(data.get('course'));
-        const studentName = text(data.get('student'));
-        const noteText = text(data.get('text'));
-        if (!findCourse(courseName) || !activeStudents(courseName).includes(studentName) || !noteText) throw new Error('Choose an active student and enter a note.');
-        ensureRecord(courseName, studentName).notes.push({
-          id: makeId('note'),
-          text: noteText,
-          date: validDate(data.get('date')) ? data.get('date') : todayISO(),
-          category: text(data.get('category')) || 'Observation'
-        });
-        ui.notesCourse = courseName;
-        ui.notesStudent = studentName;
-        save('Student note saved');
-        closeModal();
-        renderAll();
-      } else if (form.id === 'noteEditForm') {
-        const courseName = text(data.get('course'));
-        const studentName = text(data.get('student'));
-        const note = findNote(courseName, studentName, text(data.get('noteId')));
-        const noteText = text(data.get('text'));
-        if (!note || !findCourse(courseName) || !activeStudents(courseName).includes(studentName) || !noteText) throw new Error('Choose an active student and enter a note.');
-        note.text = noteText;
-        note.date = validDate(data.get('date')) ? data.get('date') : todayISO();
-        note.category = text(data.get('category')) || 'Observation';
-        ui.notesCourse = courseName;
-        ui.notesStudent = studentName;
-        ui.reportCourse = courseName;
-        ui.reportStudent = studentName;
-        save('Student note updated');
-        closeModal();
-        renderAll();
-      }
-    } catch (error) {
-      window.alert(error.message || 'That change could not be saved.');
-    }
-  }
-
-  async function handleRestoreFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      previewImport(JSON.parse(await file.text()));
-    } catch (error) {
-      window.alert(`Backup not restored: ${error.message || 'The file could not be read.'}`);
-    }
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Escape' && byId('modalRoot').children.length) closeModal();
-    const card = event.target.closest?.('[data-action="open-course"]');
-    if (card && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      setCurrentClass(card.dataset.course);
-      showView('attendance');
-    }
-  }
-
-  function init() {
-    state = loadState();
-    ensureSelections();
-    save(migratedLegacyData ? 'Local data migrated safely' : 'Local-first dashboard ready');
-    document.addEventListener('click', handleClick);
-    document.addEventListener('change', handleChange);
-    document.addEventListener('submit', handleSubmit);
-    document.addEventListener('keydown', handleKeydown);
-    byId('restoreFile').addEventListener('change', handleRestoreFile);
-    renderAll();
-    loadHistory();
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-  else init();
-})();
-, 'i'), '').trim();
-    if (!value) throw new Error('Paste the complete backup data into the box first.');
-    try {
-      return JSON.parse(value);
-    } catch (originalError) {
-      // Winston/chat copies can include a little conversation text before or after
-      // the actual export. Recover the complete Teacher Command Centre JSON object.
-      const marker = '"format": "teacher-command-centre-winston-export"';
-      const markerIndex = value.indexOf(marker);
-      if (markerIndex >= 0) {
-        const start = value.lastIndexOf('{', markerIndex);
-        const end = value.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-          try { return JSON.parse(value.slice(start, end + 1)); } catch (_) {}
-        }
-      }
-      throw originalError;
-    }
-  }
-
-  function restorePastedBackup() {
-    const box = byId('restorePayload');
-    try {
-      previewImport(parsePastedBackup(box?.value || ''));
-    } catch (error) {
       byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
       box?.focus();
     }
@@ -1951,33 +1481,13 @@
 
   async function loadHistory() {
     const now = new Date();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
-    const key = month + '-' + day;
-    const fallback = CANADIAN_HISTORY[key] ? { ...CANADIAN_HISTORY[key], source: 'Built-in Canadian history entry.' } : null;
-    try {
-      const response = await fetch('https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/' + month + '/' + day, { cache: 'no-store' });
-      if (!response.ok) throw new Error('History source unavailable');
-      const data = await response.json();
-      const events = asArray(data.events)
-        .filter(isCanadianHistoryEvent)
-        .map((event) => ({ ...event, score: historyScore(event) }))
-        .sort((a, b) => b.score - a.score);
-      const chosen = events[0];
-      if (!chosen) throw new Error('No Canadian history event returned');
-      const page = chosen.pages?.[0] || {};
-      historyItem = {
-        year: text(chosen.year),
-        title: text(page.normalizedtitle || page.title || chosen.year).replaceAll('_', ' '),
-        text: text(chosen.text || page.extract),
-        trivia: text(page.description) || 'A Canadian date on the calendar can hold a surprisingly large story.',
-        source: 'Live Canadian history event.'
-      };
-    } catch (_) {
-      historyItem = fallback;
-    }
+    const key = (now.getMonth() + 1) + '-' + now.getDate();
+    historyItem = CANADIAN_HISTORY[key]
+      ? { ...CANADIAN_HISTORY[key], source: 'Curated Canadian history entry.' }
+      : null;
     renderHistory();
   }
+
   function handleClick(event) {
     if (event.target.id === 'modalBackdrop') {
       closeModal();
