@@ -1253,7 +1253,27 @@
   function parsePastedBackup(raw) {
     let value = text(raw);
     const fence = String.fromCharCode(96).repeat(3);
-    value = value.replace(new RegExp('^' + fence + '(?:json)?\\s*', 'i'), '').replace(new RegExp('\\s*' + fence + '
+    if (value.startsWith(fence)) {
+      value = value.slice(fence.length).trimStart();
+      if (value.toLowerCase().startsWith('json')) value = value.slice(4).trimStart();
+    }
+    if (value.endsWith(fence)) value = value.slice(0, -fence.length).trimEnd();
+    if (!value) throw new Error('Paste the complete backup data into the box first.');
+    try {
+      return JSON.parse(value);
+    } catch (originalError) {
+      const marker = '"format": "teacher-command-centre-winston-export"';
+      const markerIndex = value.indexOf(marker);
+      if (markerIndex >= 0) {
+        const objectStart = value.lastIndexOf('{', markerIndex);
+        const objectEnd = value.lastIndexOf('}');
+        if (objectStart >= 0 && objectEnd > objectStart) {
+          try { return JSON.parse(value.slice(objectStart, objectEnd + 1)); } catch (_) {}
+        }
+      }
+      throw originalError;
+    }
+  }
 
   function restorePastedBackup() {
     const box = byId('restorePayload');
