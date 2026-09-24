@@ -642,6 +642,9 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .modal p { color: var(--muted); font-size: 13px; line-height: 1.42; }
 .modal-form { display: grid; gap: 12px; margin-top: 15px; }
 .modal-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 800; }
+.date-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
+.date-picker-button { min-height: 40px; padding: 7px 10px; color: #fff0a3; border-color: rgba(246,211,101,.75); background: rgba(246,211,101,.11); font-size: 12px; white-space: nowrap; }
+.date-picker-button:hover, .date-picker-button:focus-visible { background: rgba(246,211,101,.2); }
 .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .modal.alert-modal { text-align: center; border: 2px solid var(--orange); }
