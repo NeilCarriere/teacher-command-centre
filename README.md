@@ -7,8 +7,9 @@ A private, local-first teacher dashboard designed for iPad and desktop use.
 - Tracks active courses and rosters without embedding student names in the public source.
 - Records attendance (P / A / E / L), including past dates and a month-at-a-glance view.
 - Tracks participation, student notes, assignments, tests, quizzes, reminders, missing work, and quick reports.
+- Uses calendar pickers for assignment due dates and test / quiz dates.
+- Lets you mark an assignment as **Marked & Handed Back** so it clears from the active Assignment Tracker while its student marks remain in Reports.
 - Flags 5 / 10 / 15 / 20 cumulative A+E attendance thresholds.
-- Includes a daily Today in History card.
 - Exports and restores the complete dashboard backup, including tests and quizzes.
 
 ## Data and recovery
@@ -21,6 +22,5 @@ The active course roster remains authoritative. Participation levels are recorde
 
 - `index.html` — accessible app shell
 - `styles.css` — chalkboard / wood-frame interface
-- `app.js` — application logic, persistence, migration, and backup handling
+- `app.js` — application logic, persistence, migration, roster sorting, assignment tracking, and backup handling
 - `assessments.js` — tests and quizzes with editable results
-- `roster-sort.js` — roster ordering helper

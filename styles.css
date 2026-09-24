@@ -439,12 +439,6 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .level-button[data-level="3"].active { color: #332909; border-color: var(--yellow); background: var(--yellow); }
 .level-button[data-level="4"].active { color: #092017; border-color: var(--green); background: var(--green); }
 
-.history-card { position: relative; overflow: hidden; border-color: rgba(246,211,101,.38); }
-.history-card::after { position: absolute; top: 11px; right: 15px; color: var(--yellow); content: "✦"; font-size: 30px; opacity: .28; }
-.card-copy { margin: 8px 0 0; color: #e7eee9; font-size: 13px; line-height: 1.48; }
-.trivia { margin: 12px 0 0; padding: 9px 10px; color: #fff4bf; border-left: 3px solid var(--yellow); border-radius: 5px; background: rgba(246,211,101,.065); font-size: 12px; line-height: 1.4; }
-.card-source { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
-
 .reminder-note {
   position: relative;
   margin-bottom: 15px;
@@ -477,10 +471,6 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .reminder-note .empty-copy { color: #6a5b2b; }
 .reminder-note p { margin: 0; font-family: "Trebuchet MS", system-ui, sans-serif; font-size: 12.5px; line-height: 1.42; }
 .note-date { margin-top: 6px !important; opacity: .67; font-size: 11px !important; }
-.news-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px !important; }
-.news-links a { padding: 5px 8px; color: #153e55; border: 1px solid rgba(21,62,85,.28); border-radius: 999px; background: rgba(255,255,255,.25); font-size: 11px; font-weight: 800; text-decoration: none; }
-.news-links a:hover { background: rgba(255,255,255,.47); text-decoration: underline; }
-
 .threshold-grid, .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .threshold, .metric { padding: 10px 7px; border: 1px solid var(--faint); border-radius: 9px; text-align: center; }
 .threshold strong, .metric strong { display: block; font-size: 22px; }
@@ -590,16 +580,20 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .chip { padding: 3px 6px; border: 1px solid var(--faint); border-radius: 999px; color: var(--muted); font-size: 10px; font-weight: 800; }
 .chip.warning { color: #fff1b2; border-color: rgba(246,211,101,.5); }
 .chip.success { color: #c5f2d5; border-color: rgba(99,214,139,.5); }
+.chip.handed-back { color: #fff0a3; border-color: rgba(246,211,101,.72); background: rgba(246,211,101,.10); }
 .assignment-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .assignment-detail { margin-top: 15px; }
 .detail-panel { padding: 14px; border: 1px solid rgba(99,214,139,.32); border-radius: 11px; background: rgba(0,0,0,.10); }
 .detail-panel h3 { margin-bottom: 4px; }
 .detail-controls { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 12px; }
 .detail-controls label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+.detail-controls .handback-control { color: #fff0a3; border: 1px solid rgba(246,211,101,.58); border-radius: 8px; padding: 6px 8px; background: rgba(246,211,101,.08); }
+.handback-control input { width: 18px; height: 18px; min-height: 0; accent-color: var(--yellow); }
 .detail-table { min-width: 760px; }
 .detail-table input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; accent-color: var(--green); }
 .detail-table input[type="text"], .detail-table input[type="number"] { min-height: 31px; padding: 5px 6px; font-size: 12px; }
 .detail-table input[type="number"] { width: 74px; }
+.detail-table select { min-width: 76px; min-height: 31px; padding: 5px 6px; font-size: 12px; }
 .detail-table .submitted-row { background: rgba(99,214,139,.035); }
 .detail-table .missing-row { background: rgba(255,107,107,.028); }
 
@@ -711,7 +705,6 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .dashboard-reminders .reminder-list {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
-.dashboard-history { margin-bottom: 15px; }
 .dashboard-footer-cards { margin-top: 15px; margin-bottom: 0; }
 .class-cards { gap: 12px; }
 .class-card { min-height: 96px; padding: 11px 12px; }
@@ -851,15 +844,16 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 }
 
 
-/* v25: slightly dusty printed-chalk treatment */
+/* Dusty, printed-chalk treatment — deliberately blocky and readable, never cursive. */
 .brand, .app-header h1, .panel h2, .panel h3, .reminder-note h2, .reminder-note h3,
 .nav-button, .panel-kicker, .eyebrow, .class-card h2, .command-card .word, .quote-copy {
   text-shadow:
-    0.45px 0.35px 0 rgba(255,255,255,.18),
-    -0.55px 0.25px 0 rgba(243,240,223,.10),
-    0 0 1.2px rgba(243,240,223,.22),
+    0.55px 0.4px 0 rgba(255,255,255,.20),
+    -0.65px 0.28px 0 rgba(243,240,223,.12),
+    0 0 1.45px rgba(243,240,223,.24),
     1px 1px 0 rgba(0,0,0,.16);
 }
 .panel h2, .panel h3, .app-header h1, .class-card h2 {
-  letter-spacing: .015em;
+  letter-spacing: .02em;
+  -webkit-text-stroke: .15px rgba(255,255,255,.08);
 }

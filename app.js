@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 18;
+  const APP_VERSION = 19;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -18,6 +18,8 @@
   const ATTENDANCE_CODES = ['P', 'A', 'E', 'L'];
   const ATTENDANCE_LABELS = { P: 'Present', A: 'Absent', E: 'Excused', L: 'Late' };
   const THRESHOLDS = [5, 10, 15, 20];
+  const ACHIEVEMENT_LEVELS = ['', 'R', '1-', '1', '1+', '2-', '2', '2+', '3-', '3', '3+', '4-', '4', '4+'];
+  const ROSTER_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   const BOARD_NON_SCHOOL_DATES = new Set([
     '2026-09-01', '2026-09-07', '2026-10-12', '2026-10-26', '2026-11-27',
     '2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24', '2026-12-25',
@@ -107,61 +109,9 @@
     'Start where you are, with what is actually available.',
     'A small adjustment today can save a great deal of frustration tomorrow.'
   ];
-  const CANADIAN_HISTORY = {
-    '2-15': {
-      year: '1965',
-      title: 'Canada’s maple-leaf flag is first raised',
-      text: 'Canada’s current national flag was officially raised for the first time on Parliament Hill. The design helped create a distinct national symbol used across the country and around the world.',
-      trivia: 'The red-and-white design was selected after a long national debate about symbols and identity.'
-    },
-    '4-9': {
-      year: '1917',
-      title: 'Canadian Corps captures Vimy Ridge',
-      text: 'All four divisions of the Canadian Corps fought together in the First World War assault on Vimy Ridge. The battle became an important, though complicated, symbol in Canadian collective memory.',
-      trivia: 'The Canadian National Vimy Memorial in France honours Canadians who served in the First World War.'
-    },
-    '6-21': {
-      year: '1996',
-      title: 'National Indigenous Peoples Day is first celebrated',
-      text: 'Canada first marked a national day recognizing First Nations, Inuit, and Métis peoples on the summer solstice. It is a time to learn about Indigenous histories, cultures, contributions, and contemporary life.',
-      trivia: 'The day was originally called National Aboriginal Day and was renamed in 2017.'
-    },
-    '7-1': {
-      year: '1867',
-      title: 'Canadian Confederation',
-      text: 'The British North America Act came into force, creating the Dominion of Canada from Ontario, Quebec, Nova Scotia, and New Brunswick. Canada has changed considerably since that first Confederation.',
-      trivia: 'The anniversary was known as Dominion Day until it was renamed Canada Day in 1982.'
-    },
-    '9-10': {
-      year: '1939',
-      title: 'Canada declares war on Germany',
-      text: 'Canada formally declared war on Germany one week after Britain and France entered the Second World War. The decision followed debate in Canada’s own Parliament, reflecting Canada’s growing independence in foreign affairs.',
-      trivia: 'More than one million Canadians and Newfoundlanders served during the Second World War.'
-    },
-    '9-11': {
-      year: '2001',
-      title: 'Operation Yellow Ribbon welcomes diverted flights',
-      text: 'After airspace in the United States closed following the September 11 attacks, Canada received hundreds of diverted international flights. Communities, especially in Atlantic Canada, welcomed thousands of stranded travellers.',
-      trivia: 'Gander, Newfoundland became internationally known for its extraordinary community response.'
-    },
-    '9-30': {
-      year: '2021',
-      title: 'Canada observes its first National Day for Truth and Reconciliation',
-      text: 'The federal statutory holiday honours Survivors of residential schools, the children who never returned home, their families, and communities. It is an important day for reflection, learning, and action.',
-      trivia: 'Orange Shirt Day, observed on the same date, grew from Phyllis Webstad’s story of attending residential school.'
-    },
-    '11-11': {
-      year: '1918',
-      title: 'Armistice ends major fighting in the First World War',
-      text: 'The armistice between the Allies and Germany took effect at 11 a.m., ending major fighting on the Western Front. In Canada, November 11 is observed as Remembrance Day.',
-      trivia: 'The phrase “the eleventh hour of the eleventh day of the eleventh month” refers to the armistice taking effect.'
-    }
-  };
-
   let state;
   let migratedLegacyData = false;
   let pendingImport = null;
-  let historyItem = null;
   let reportProfileMarkup = '';
   const ui = {
     view: 'dashboard',
@@ -248,6 +198,26 @@
     });
   }
 
+  function rosterNameParts(value) {
+    const parts = text(value).split(/\s+/).filter(Boolean);
+    const last = parts.length > 1 ? parts.pop() : (parts[0] || '');
+    return { full: text(value), first: parts.join(' '), last };
+  }
+
+  function sortRoster(students) {
+    return [...students].sort((left, right) => {
+      const a = rosterNameParts(left);
+      const b = rosterNameParts(right);
+      return ROSTER_COLLATOR.compare(a.last, b.last)
+        || ROSTER_COLLATOR.compare(a.first, b.first)
+        || ROSTER_COLLATOR.compare(a.full, b.full);
+    });
+  }
+
+  function achievementOptions(selected) {
+    return ACHIEVEMENT_LEVELS.map((level) => `<option value="${level}" ${level === selected ? 'selected' : ''}>${level || '—'}</option>`).join('');
+  }
+
   function makeId(prefix) {
     if (window.crypto?.randomUUID) return `${prefix}-${window.crypto.randomUUID()}`;
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -322,7 +292,7 @@
     return {
       name: text(source.name),
       archived: Boolean(source.archived),
-      students: uniqueStrings(source.students)
+      students: sortRoster(uniqueStrings(source.students))
     };
   }
 
@@ -344,6 +314,7 @@
 
   function normalizeAssignment(item, activeStudents) {
     const source = isObject(item) ? item : {};
+    const { archived: legacyArchived, markedHandedBack, ...details } = source;
     const roster = uniqueStrings(activeStudents);
     const rosterNames = new Set(roster);
     const studentData = {};
@@ -357,14 +328,14 @@
       if (!studentData[name]) studentData[name] = normalizeSubmission({});
     });
     return {
-      ...source,
+      ...details,
       id: text(source.id) || makeId('assignment'),
       name: text(source.name) || 'Untitled assignment',
       assigned: validDate(source.assigned) ? source.assigned : todayISO(),
       due: validDate(source.due) ? source.due : '',
       maxMark: Number.isFinite(Number(source.maxMark)) ? Math.max(1, Number(source.maxMark)) : 4,
       grading: text(source.grading) || 'levels',
-      archived: Boolean(source.archived),
+      markedHandedBack: Boolean(markedHandedBack || legacyArchived),
       participationEvidence: Boolean(source.participationEvidence),
       formativeClasswork: Boolean(source.formativeClasswork),
       students: studentData
@@ -503,6 +474,7 @@
   }
 
   function assignmentsFor(courseName) {
+    if (!courseName) return [];
     if (!state.assignmentTracker.classes[courseName]) state.assignmentTracker.classes[courseName] = { assignments: [] };
     return state.assignmentTracker.classes[courseName].assignments;
   }
@@ -522,9 +494,9 @@
     if (!activeStudents(ui.notesCourse).includes(ui.notesStudent)) ui.notesStudent = activeStudents(ui.notesCourse)[0] || '';
     const reportRoster = activeStudents(ui.reportCourse);
     if (!reportRoster.includes(ui.reportStudent)) ui.reportStudent = reportRoster[0] || '';
-    const selectedExists = findAssignment(ui.assignmentCourse, ui.selectedAssignmentId);
-    if (!selectedExists) {
-      ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.archived)?.id || assignmentsFor(ui.assignmentCourse)[0]?.id || '';
+    const selectedAssignment = findAssignment(ui.assignmentCourse, ui.selectedAssignmentId);
+    if (!selectedAssignment || selectedAssignment.markedHandedBack) {
+      ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.markedHandedBack)?.id || '';
     }
   }
 
@@ -665,7 +637,7 @@
           items.push({ type: 'legacy', course: course.name, student, name: item.name, status: item.status, due: item.date, id: item.id });
         });
       });
-      assignmentsFor(course.name).filter((assignment) => !assignment.archived).forEach((assignment) => {
+      assignmentsFor(course.name).filter((assignment) => !assignment.markedHandedBack).forEach((assignment) => {
         course.students.forEach((student) => {
           const row = normalizeSubmission(assignment.students?.[student]);
           if (!row.submitted && !row.notRequired) {
@@ -751,6 +723,7 @@
         <div class="class-actions">
           <button type="button" class="mini-button" data-action="open-attendance-course" data-course="${escapeAttr(course.name)}">Attendance</button>
           <button type="button" class="mini-button" data-action="open-assignments-course" data-course="${escapeAttr(course.name)}">Assignments</button>
+          <button type="button" class="mini-button" data-action="open-assessments-course" data-course="${escapeAttr(course.name)}">Tests &amp; Quizzes</button>
           <button type="button" class="mini-button" data-action="open-notes-course" data-course="${escapeAttr(course.name)}">Notes</button>
         </div>
       </section>`;
@@ -818,22 +791,6 @@
       : '<p class="empty-copy">Nothing written down yet. That is allowed.</p>';
   }
 
-  function renderHistory() {
-    const card = document.querySelector('.history-card');
-    const key = (new Date().getMonth() + 1) + '-' + new Date().getDate();
-    const fallback = CANADIAN_HISTORY[key] ? { ...CANADIAN_HISTORY[key], source: 'Built-in Canadian history entry.' } : null;
-    const item = historyItem || fallback;
-    if (!item) {
-      card?.classList.add('hidden');
-      return;
-    }
-    card?.classList.remove('hidden');
-    byId('historyDate').textContent = 'TODAY IN HISTORY — ' + formatDate(todayISO(), { month: 'long', day: 'numeric' }).toUpperCase();
-    byId('historyTitle').textContent = (item.year ? item.year + ' — ' : '') + item.title;
-    byId('historyText').textContent = item.text;
-    byId('historyTrivia').textContent = '💡 Trivia: ' + item.trivia;
-    byId('historySource').textContent = item.source || 'Canadian history source.';
-  }
   function renderDashboard() {
     renderCommandStrip();
     renderClassCards();
@@ -841,7 +798,6 @@
     renderThresholdSummary();
     renderMissingSummary();
     renderReminders();
-    renderHistory();
   }
 
   function courseOptions(selected, includeArchived = false) {
@@ -910,36 +866,39 @@
       return;
     }
     const assignments = assignmentsFor(courseName);
-    const open = assignments.filter((assignment) => !assignment.archived);
+    const open = assignments.filter((assignment) => !assignment.markedHandedBack);
     const missing = open.reduce((total, assignment) => total + assignmentStats(courseName, assignment).missing, 0);
     byId('assignmentSummary').textContent = `${open.length} active assignment${open.length === 1 ? '' : 's'} · ${missing} open student item${missing === 1 ? '' : 's'} · ${course.students.length} active student${course.students.length === 1 ? '' : 's'}`;
-    byId('assignmentList').innerHTML = assignments.length ? assignments.map((assignment) => {
+    byId('assignmentList').innerHTML = open.length ? open.map((assignment) => {
       const stats = assignmentStats(courseName, assignment);
-      return `<article class="assignment-card ${assignment.archived ? 'archived' : ''}">
+      return `<article class="assignment-card">
         <div>
           <h3>${escapeHtml(assignment.name)}</h3>
           <p class="assignment-meta">Assigned ${escapeHtml(formatShortDate(assignment.assigned))}${assignment.due ? ` · Due ${escapeHtml(formatShortDate(assignment.due))}` : ''} · ${escapeHtml(assignment.grading === 'marks' ? `${assignment.maxMark} marks` : `Level ${assignment.maxMark}`)}</p>
-          <div class="assignment-stats"><span class="chip success">${stats.submitted} submitted</span><span class="chip warning">${stats.missing} open</span>${stats.notRequired ? `<span class="chip">${stats.notRequired} N/A</span>` : ''}${assignment.participationEvidence ? '<span class="chip">Participation evidence</span>' : ''}${assignment.formativeClasswork ? '<span class="chip">Formative</span>' : ''}${assignment.archived ? '<span class="chip">Archived</span>' : ''}</div>
+          <div class="assignment-stats"><span class="chip success">${stats.submitted} submitted</span><span class="chip warning">${stats.missing} open</span>${stats.notRequired ? `<span class="chip">${stats.notRequired} N/A</span>` : ''}${assignment.participationEvidence ? '<span class="chip">Participation evidence</span>' : ''}${assignment.formativeClasswork ? '<span class="chip">Formative</span>' : ''}</div>
         </div>
-        <div class="assignment-actions"><button type="button" class="secondary-button" data-action="open-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">${ui.selectedAssignmentId === assignment.id ? 'Open' : 'Details'}</button><button type="button" class="secondary-button" data-action="edit-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">Edit</button><button type="button" class="secondary-button" data-action="archive-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">${assignment.archived ? 'Restore' : 'Archive'}</button></div>
+        <div class="assignment-actions"><button type="button" class="secondary-button" data-action="open-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">${ui.selectedAssignmentId === assignment.id ? 'Open' : 'Details'}</button><button type="button" class="secondary-button" data-action="edit-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">Edit</button></div>
       </article>`;
-    }).join('') : '<p class="empty-copy">No assignments yet. Add one when you are ready.</p>';
+    }).join('') : '<p class="empty-copy">No active assignments. Marked &amp; Handed Back work remains in student reports with its marks.</p>';
     renderAssignmentDetail(courseName, ui.selectedAssignmentId);
   }
 
   function renderAssignmentDetail(courseName, assignmentId) {
     const host = byId('assignmentDetail');
     const assignment = findAssignment(courseName, assignmentId);
-    if (!assignment) {
+    if (!assignment || assignment.markedHandedBack) {
       host.innerHTML = '';
       return;
     }
     const course = findCourse(courseName);
     const rows = course.students.map((student) => {
       const row = normalizeSubmission(assignment.students?.[student]);
-      return `<tr class="${row.submitted || row.notRequired ? 'submitted-row' : 'missing-row'}"><td><strong>${escapeHtml(student)}</strong></td><td><input type="checkbox" data-assignment-field="submitted" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.submitted ? 'checked' : ''} aria-label="${escapeAttr(student)} submitted"></td><td><input type="checkbox" data-assignment-field="notRequired" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.notRequired ? 'checked' : ''} aria-label="${escapeAttr(student)} not required"></td><td><input type="text" value="${escapeAttr(row.mark)}" data-assignment-field="mark" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} achievement"></td><td><input type="text" value="${escapeAttr(row.note)}" data-assignment-field="note" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} note"></td></tr>`;
+      const achievementControl = assignment.grading === 'levels'
+        ? `<select data-assignment-field="mark" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} achievement">${achievementOptions(row.mark)}</select>`
+        : `<input type="number" min="0" max="${assignment.maxMark}" step="0.5" value="${escapeAttr(row.mark)}" data-assignment-field="mark" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} mark">`;
+      return `<tr class="${row.submitted || row.notRequired ? 'submitted-row' : 'missing-row'}"><td><strong>${escapeHtml(student)}</strong></td><td><input type="checkbox" data-assignment-field="submitted" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.submitted ? 'checked' : ''} aria-label="${escapeAttr(student)} submitted"></td><td><input type="checkbox" data-assignment-field="notRequired" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.notRequired ? 'checked' : ''} aria-label="${escapeAttr(student)} not required"></td><td>${achievementControl}</td><td><input type="text" value="${escapeAttr(row.note)}" data-assignment-field="note" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} note"></td></tr>`;
     }).join('');
-    host.innerHTML = `<section class="detail-panel"><h3>${escapeHtml(assignment.name)}</h3><p class="assignment-meta">Current active roster only. Historical student entries remain in the data but are not re-added to this class.</p><div class="detail-controls"><label><input type="checkbox" data-assignment-toggle="participationEvidence" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.participationEvidence ? 'checked' : ''}> Participation evidence</label><label><input type="checkbox" data-assignment-toggle="formativeClasswork" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.formativeClasswork ? 'checked' : ''}> Formative classroom work</label></div><div class="table-wrap"><table class="data-table detail-table"><thead><tr><th>Student</th><th>Submitted</th><th>N/A</th><th>Achievement</th><th>Note</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No active students are on this roster.</td></tr>'}</tbody></table></div></section>`;
+    host.innerHTML = `<section class="detail-panel"><h3>${escapeHtml(assignment.name)}</h3><p class="assignment-meta">Current active roster only. Historical student entries remain in the data but are not re-added to this class.</p><div class="detail-controls"><label><input type="checkbox" data-assignment-toggle="participationEvidence" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.participationEvidence ? 'checked' : ''}> Participation evidence</label><label><input type="checkbox" data-assignment-toggle="formativeClasswork" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.formativeClasswork ? 'checked' : ''}> Formative classroom work</label><label class="handback-control"><input type="checkbox" data-assignment-toggle="markedHandedBack" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.markedHandedBack ? 'checked' : ''}> Marked &amp; Handed Back</label></div><div class="table-wrap"><table class="data-table detail-table"><thead><tr><th>Student</th><th>Submitted</th><th>N/A</th><th>${assignment.grading === 'levels' ? 'Achievement' : 'Mark'}</th><th>Note</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No active students are on this roster.</td></tr>'}</tbody></table></div></section>`;
   }
 
 
@@ -964,7 +923,9 @@
       return;
     }
 
-    const allAssignments = assignmentsFor(courseName).filter((assignment) => !assignment.archived);
+    const activeAssignments = assignmentsFor(courseName).filter((assignment) => !assignment.markedHandedBack);
+    const handedBackAssignments = assignmentsFor(courseName).filter((assignment) => assignment.markedHandedBack);
+    const reportAssignments = [...activeAssignments, ...handedBackAssignments];
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
@@ -975,7 +936,7 @@
     if (cards) {
       cards.innerHTML = course.students.length ? course.students.map((student) => {
         const record = ensureRecord(courseName, student);
-        const open = allAssignments.filter((assignment) => {
+        const open = activeAssignments.filter((assignment) => {
           const row = normalizeSubmission(assignment.students?.[student]);
           return !row.submitted && !row.notRequired;
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
@@ -993,21 +954,22 @@
     const record = ensureRecord(courseName, selectedStudent);
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
-    const assignmentRows = allAssignments.map((assignment) => {
+    const assignmentRows = reportAssignments.map((assignment) => {
       const row = normalizeSubmission(assignment.students?.[selectedStudent]);
-      const status = row.notRequired ? 'N/A' : row.submitted ? 'Complete' : (assignment.due && assignment.due < todayISO() ? 'Overdue' : 'Missing');
-      const statusClass = status === 'Complete' || status === 'N/A' ? 'success' : 'warning';
+      const status = assignment.markedHandedBack ? 'Handed back' : (row.notRequired ? 'N/A' : row.submitted ? 'Complete' : (assignment.due && assignment.due < todayISO() ? 'Overdue' : 'Missing'));
+      const statusClass = assignment.markedHandedBack ? 'handed-back' : (status === 'Complete' || status === 'N/A' ? 'success' : 'warning');
       const due = assignment.due ? 'Due ' + formatShortDate(assignment.due) : 'No due date';
-      return '<li class="report-assignment"><span><strong>' + escapeHtml(assignment.name) + '</strong><small>' + escapeHtml(due) + '</small></span><span class="chip ' + statusClass + '">' + status + '</span></li>';
+      const mark = text(row.mark) ? ' · Mark: ' + row.mark : '';
+      return '<li class="report-assignment"><span><strong>' + escapeHtml(assignment.name) + '</strong><small>' + escapeHtml(due + mark) + '</small></span><span class="chip ' + statusClass + '">' + status + '</span></li>';
     });
     const assignmentItems = [...missingLegacy, ...assignmentRows].join('');
-    const submitted = allAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[selectedStudent]).submitted).length;
-    const outstanding = allAssignments.filter((assignment) => {
+    const submitted = activeAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[selectedStudent]).submitted).length;
+    const outstanding = activeAssignments.filter((assignment) => {
       const row = normalizeSubmission(assignment.students?.[selectedStudent]);
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + allAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4><p class="panel-help">Marked &amp; Handed Back work stays here with its recorded mark.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
     
   }
 
@@ -1071,7 +1033,7 @@
     ui.manageCourse = courseName;
     ui.notesStudent = activeStudents(courseName)[0] || '';
     ui.reportStudent = activeStudents(courseName)[0] || '';
-    ui.selectedAssignmentId = assignmentsFor(courseName).find((assignment) => !assignment.archived)?.id || assignmentsFor(courseName)[0]?.id || '';
+    ui.selectedAssignmentId = assignmentsFor(courseName).find((assignment) => !assignment.markedHandedBack)?.id || '';
     save(saveMessage);
   }
 
@@ -1391,6 +1353,7 @@
     if (!name) throw new Error('Enter a student display name.');
     if (course.students.some((student) => student.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('That student is already in this active roster.');
     course.students.push(name);
+    course.students = sortRoster(course.students);
     ensureRecord(courseName, name);
     assignmentsFor(courseName).forEach((assignment) => {
       if (!assignment.students[name]) assignment.students[name] = normalizeSubmission({});
@@ -1408,7 +1371,7 @@
       window.alert('That name is already in this active roster.');
       return;
     }
-    course.students = course.students.map((student) => student === oldName ? next : student);
+    course.students = sortRoster(course.students.map((student) => student === oldName ? next : student));
     const records = state.studentData.students[courseName] || {};
     if (records[oldName]) {
       records[next] = records[oldName];
@@ -1460,32 +1423,15 @@
   function updateAssignmentToggle(target) {
     const assignment = findAssignment(target.dataset.course, target.dataset.assignmentId);
     if (!assignment) return;
-    assignment[target.dataset.assignmentToggle] = target.checked;
-    save('Assignment details saved');
-  }
-
-  function isCanadaText(value) {
-    return /\b(canada|canadian|ontario|quebec|manitoba|saskatchewan|alberta|british columbia|newfoundland|nova scotia|new brunswick|pei|prince edward island|nunavut|yukon|northwest territories|ottawa|toronto|montreal|vancouver|winnipeg|halifax|gander|acadia|upper canada|lower canada|dominion of canada|new france)\b/i.test(value);
-  }
-  function isCanadianHistoryEvent(event) {
-    const page = event.pages?.[0] || {};
-    const value = [event.text, page.description, page.extract, page.title].filter(Boolean).join(' ');
-    return isCanadaText(value);
-  }
-
-  function historyScore(event) {
-    let score = isCanadianHistoryEvent(event) ? 100 : 0;
-    if (Number(event.year) >= 1800) score += 4;
-    return score;
-  }
-
-  async function loadHistory() {
-    const now = new Date();
-    const key = (now.getMonth() + 1) + '-' + now.getDate();
-    historyItem = CANADIAN_HISTORY[key]
-      ? { ...CANADIAN_HISTORY[key], source: 'Curated Canadian history entry.' }
-      : null;
-    renderHistory();
+    const field = target.dataset.assignmentToggle;
+    if (field === 'markedHandedBack' && target.checked && !window.confirm('Mark this assignment as handed back? It will leave the Assignment Tracker but stay in every student report with its recorded marks.')) {
+      target.checked = false;
+      return;
+    }
+    assignment[field] = target.checked;
+    save(field === 'markedHandedBack'
+      ? (target.checked ? 'Assignment marked & handed back' : 'Assignment returned to tracker')
+      : 'Assignment details saved');
   }
 
   function handleClick(event) {
@@ -1509,6 +1455,15 @@
       case 'open-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
       case 'open-attendance-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
       case 'open-assignments-course': setCurrentClass(target.dataset.course); showView('assignments'); break;
+      case 'open-assessments-course':
+        setCurrentClass(target.dataset.course);
+        showView('assessments');
+        window.setTimeout(() => {
+          const tab = [...document.querySelectorAll('[data-assessment-course]')]
+            .find((item) => item.dataset.assessmentCourse === target.dataset.course);
+          tab?.click();
+        }, 0);
+        break;
       case 'open-notes-course': setCurrentClass(target.dataset.course); showView('notes'); break;
       case 'quick-attendance':
       case 'attendance-status': {
@@ -1530,22 +1485,13 @@
       case 'select-assignment-course':
         ui.assignmentCourse = target.dataset.course;
         state.currentClass = ui.assignmentCourse;
-        ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.archived)?.id || assignmentsFor(ui.assignmentCourse)[0]?.id || '';
+        ui.selectedAssignmentId = assignmentsFor(ui.assignmentCourse).find((assignment) => !assignment.markedHandedBack)?.id || '';
         save('Class selection saved');
         renderAll();
         break;
       case 'show-add-assignment': showAddAssignment(); break;
       case 'open-assignment': ui.assignmentCourse = target.dataset.course; ui.selectedAssignmentId = target.dataset.assignmentId; renderAll(); break;
       case 'edit-assignment': showEditAssignment(target.dataset.course, target.dataset.assignmentId); break;
-      case 'archive-assignment': {
-        const assignment = findAssignment(target.dataset.course, target.dataset.assignmentId);
-        if (assignment) {
-          assignment.archived = !assignment.archived;
-          save(`Assignment ${assignment.archived ? 'archived' : 'restored'}`);
-          renderAll();
-        }
-        break;
-      }
       case 'show-add-note': showAddNote(); break;
       case 'edit-note': showEditNote(target.dataset.course, target.dataset.student, target.dataset.noteId); break;
       case 'delete-note': {
@@ -1665,7 +1611,7 @@
           maxMark: data.get('maxMark'),
           participationEvidence: data.get('participationEvidence') === 'on',
           formativeClasswork: data.get('formativeClasswork') === 'on',
-          archived: false,
+          markedHandedBack: false,
           students: {}
         }, course.students);
         assignmentsFor(courseName).push(assignment);
@@ -1754,7 +1700,6 @@
     document.addEventListener('keydown', handleKeydown);
     byId('restoreFile').addEventListener('change', handleRestoreFile);
     renderAll();
-    loadHistory();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

@@ -55,7 +55,8 @@
   function showModal(html) {
     const root = byId('modalRoot');
     if (!root) return;
-    root.innerHTML = `<div class="modal-backdrop"><section class="modal-card">${html}</section></div>`;
+    root.innerHTML = `<div id="modalBackdrop" class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true">${html}</section></div>`;
+    root.querySelector('input, textarea, select, button')?.focus();
   }
   function closeModal() { const root = byId('modalRoot'); if (root) root.innerHTML=''; }
 
@@ -88,7 +89,7 @@
 
   function addForm(a=null) {
     const editing = Boolean(a);
-    showModal(`<h2>${editing?'Edit':'Add'} Test / Quiz</h2><form id="assessmentForm" class="modal-form"><label>Class<select name="course">${courses().map(c=>`<option ${c.name===courseName?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Name<input name="name" required value="${attr(a?.name||'')}" placeholder="e.g. Municipal Elections Quiz"></label><div class="modal-row"><label>Type<select name="type"><option ${a?.type==='Test'?'selected':''}>Test</option><option ${a?.type==='Quiz'?'selected':''}>Quiz</option></select></label><label>Date<input type="date" name="date" required value="${attr(a?.date||today())}"></label></div><label>Maximum mark<input type="number" name="maxMark" min="1" value="${Number(a?.maxMark)||100}" required></label>${editing?`<input type="hidden" name="id" value="${attr(a.id)}">`:''}<div class="modal-actions"><button type="button" class="secondary-button" data-assessment-close>Cancel</button><button type="submit" class="primary-button">${editing?'Save Changes':'Add Test / Quiz'}</button></div></form>`);
+    showModal(`<h2>${editing?'Edit':'Add'} Test / Quiz</h2><form id="assessmentForm" class="modal-form"><label>Class<select name="course">${courses().map(c=>`<option ${c.name===courseName?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Name<input name="name" required value="${attr(a?.name||'')}" placeholder="e.g. Municipal Elections Quiz"></label><div class="modal-row"><label>Type<select name="type"><option ${a?.type==='Test'?'selected':''}>Test</option><option ${a?.type==='Quiz'?'selected':''}>Quiz</option></select></label><label>Date<input type="date" name="date" required value="${attr(a?.date||today())}" aria-label="Test or quiz date" title="Choose the date from the calendar"></label></div><label>Maximum mark<input type="number" name="maxMark" min="1" value="${Number(a?.maxMark)||100}" required></label>${editing?`<input type="hidden" name="id" value="${attr(a.id)}">`:''}<div class="modal-actions"><button type="button" class="secondary-button" data-assessment-close>Cancel</button><button type="submit" class="primary-button">${editing?'Save Changes':'Add Test / Quiz'}</button></div></form>`);
   }
 
   function cloneData(value) {
