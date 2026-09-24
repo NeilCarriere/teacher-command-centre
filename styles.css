@@ -723,7 +723,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
   display: grid;
   gap: 10px;
   width: 100%;
-  min-height: 112px;
+  min-height: 146px;
   padding: 12px;
   color: var(--chalk);
   border: 1px solid var(--faint);
@@ -744,6 +744,19 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 }
 .report-card-heading strong { font-size: 15px; }
 .report-card-heading span { color: var(--muted); font-size: 11px; }
+.report-card-running {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label mark" "detail mark";
+  gap: 2px 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(246,211,101,.34);
+  border-radius: 7px;
+  background: rgba(246,211,101,.07);
+}
+.report-card-running span { grid-area: label; color: var(--muted); font-size: 10px; }
+.report-card-running strong { grid-area: mark; align-self: center; color: var(--yellow); font-size: 22px; line-height: 1; }
+.report-card-running small { grid-area: detail; color: var(--muted); font-size: 10px; line-height: 1.2; }
 .report-card-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -767,6 +780,21 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 .report-profile-heading { margin-bottom: 12px; }
 .report-profile-heading h3 { margin: 0; font-size: 22px; }
 .report-profile-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.running-mark-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(246,211,101,.46);
+  border-radius: 9px;
+  background: rgba(246,211,101,.08);
+}
+.running-mark-panel div { display: grid; gap: 2px; min-width: 8.75rem; }
+.running-mark-panel span { color: var(--muted); font-size: 11px; }
+.running-mark-panel strong { color: var(--yellow); font-size: 30px; line-height: 1; }
+.running-mark-panel p { margin: 0; color: var(--chalk); font-size: 12px; line-height: 1.4; }
 .report-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -795,6 +823,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 }
 .report-section h4 { margin: 0 0 8px; color: var(--chalk); font-size: 15px; }
 .report-section .notes-list { margin-top: 0; }
+.report-evidence-section { grid-column: 1 / -1; }
 .report-assignment-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .report-assignment {
   display: flex;
@@ -826,6 +855,7 @@ input::placeholder, textarea::placeholder { color: rgba(183,200,191,.72); }
 }
 @media (max-width: 520px) {
   .report-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .running-mark-panel { grid-template-columns: 1fr; gap: 8px; }
 }
 
 

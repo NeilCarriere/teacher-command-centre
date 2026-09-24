@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#102421">
   <meta name="description" content="A private, local-first teacher dashboard for planning, tracking, and reviewing classroom information.">
   <title>Neil's Teacher Command Centre</title>
-  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
   <div class="app-shell">
@@ -100,7 +100,7 @@
 
       <section id="reportsView" class="view hidden">
         <section class="panel">
-          <div class="panel-heading split-heading"><div><p class="panel-kicker">QUICK FACTUAL SNAPSHOT</p><h2>Reports</h2><p class="panel-help">Choose an active student for a compact profile answering the useful question: “What am I missing?”</p></div><label class="compact-field">Class <select id="reportCourse"></select></label></div>
+          <div class="panel-heading split-heading"><div><p class="panel-kicker">QUICK FACTUAL SNAPSHOT</p><h2>Reports</h2><p class="panel-help">See each student’s current running mark from entered evidence, plus a quick answer to: “What am I missing?”</p></div><label class="compact-field">Class <select id="reportCourse"></select></label></div>
           <div id="reportMetrics" class="metric-grid"></div>
           <div id="reportCards" class="report-cards"></div>
         </section>
@@ -132,7 +132,7 @@
   </div>
   <input id="restoreFile" type="file" accept="application/json,.json,text/plain" hidden>
   <div id="modalRoot" aria-live="polite"></div>
-  <script src="app.js?v=30" defer></script>
-  <script src="assessments.js?v=6" defer></script>
+  <script src="assessments.js?v=7" defer></script>
+  <script src="app.js?v=31" defer></script>
 </body>
 </html>

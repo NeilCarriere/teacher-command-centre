@@ -25,6 +25,7 @@
     localStorage.setItem(KEY, JSON.stringify(data));
     const status = byId('saveStatus');
     if (status) status.textContent = `${message} · ${new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}`;
+    window.dispatchEvent(new Event('teacher-command-centre-assessments-updated'));
   }
   function appState() {
     try { return JSON.parse(localStorage.getItem(APP_KEY) || '{}'); } catch (_) { return {}; }

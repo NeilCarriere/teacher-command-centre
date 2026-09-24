@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 19;
+  const APP_VERSION = 20;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -18,7 +18,14 @@
   const ATTENDANCE_CODES = ['P', 'A', 'E', 'L'];
   const ATTENDANCE_LABELS = { P: 'Present', A: 'Absent', E: 'Excused', L: 'Late' };
   const THRESHOLDS = [5, 10, 15, 20];
-  const ACHIEVEMENT_LEVELS = ['', 'R', '1-', '1', '1+', '2-', '2', '2+', '3-', '3', '3+', '4-', '4', '4+'];
+  const ACHIEVEMENT_LEVELS = ['', 'R', '1-', '1', '1+', '2-', '2', '2+', '3-', '3', '3+', '4-', '4', '4+', '4++'];
+  const ACHIEVEMENT_PERCENTAGES = Object.freeze({
+    R: 40,
+    '1-': 52, '1': 55, '1+': 59,
+    '2-': 62, '2': 65, '2+': 69,
+    '3-': 72, '3': 75, '3+': 79,
+    '4-': 82, '4': 85, '4+': 90, '4++': 100
+  });
   const ROSTER_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   const BOARD_NON_SCHOOL_DATES = new Set([
     '2026-09-01', '2026-09-07', '2026-10-12', '2026-10-26', '2026-11-27',
@@ -483,6 +490,81 @@
     return assignmentsFor(courseName).find((assignment) => assignment.id === assignmentId) || null;
   }
 
+  function percentageFromNumericMark(mark, maximum) {
+    if (!text(mark)) return null;
+    const score = Number(mark);
+    const max = Number(maximum);
+    if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return null;
+    return Math.max(0, Math.min(100, (score / max) * 100));
+  }
+
+  function percentageFromAchievement(mark) {
+    const level = text(mark);
+    return Object.prototype.hasOwnProperty.call(ACHIEVEMENT_PERCENTAGES, level)
+      ? ACHIEVEMENT_PERCENTAGES[level]
+      : null;
+  }
+
+  function formatPercentage(value) {
+    return Number.isFinite(value) ? `${Math.round(value)}%` : '—';
+  }
+
+  function assignmentEvidenceForStudent(courseName, studentName) {
+    return assignmentsFor(courseName).map((assignment) => {
+      const row = normalizeSubmission(assignment.students?.[studentName]);
+      if (row.notRequired) return null;
+      const percentage = assignment.grading === 'levels'
+        ? percentageFromAchievement(row.mark)
+        : percentageFromNumericMark(row.mark, assignment.maxMark);
+      if (percentage === null) return null;
+
+      const mark = text(row.mark);
+      const markDetail = assignment.grading === 'levels'
+        ? `Assignment · Level ${mark}`
+        : `Assignment · ${mark}/${assignment.maxMark}`;
+      const date = assignment.due || assignment.assigned;
+      const dateDetail = date ? ` · ${assignment.due ? 'Due' : 'Assigned'} ${formatShortDate(date)}` : '';
+      const status = assignment.markedHandedBack ? 'Handed back · ' : '';
+      return {
+        name: assignment.name,
+        percentage,
+        detail: status + markDetail + dateDetail
+      };
+    }).filter(Boolean);
+  }
+
+  function testQuizEvidenceForStudent(courseName, studentName, assessmentData) {
+    const assessments = asArray(assessmentData?.classes?.[courseName]?.assessments);
+    return assessments.map((assessment) => {
+      const row = isObject(assessment?.students?.[studentName]) ? assessment.students[studentName] : null;
+      const mark = text(row?.mark);
+      const maximum = Number(assessment?.maxMark) || 100;
+      const percentage = percentageFromNumericMark(mark, maximum);
+      if (percentage === null) return null;
+
+      const type = text(assessment?.type) || 'Test / quiz';
+      const date = validDate(assessment?.date) ? ` · ${formatShortDate(assessment.date)}` : '';
+      const status = assessment?.archived ? 'Archived · ' : '';
+      return {
+        name: text(assessment?.name) || 'Untitled test / quiz',
+        percentage,
+        detail: status + type + ` · ${mark}/${maximum}` + date
+      };
+    }).filter(Boolean);
+  }
+
+  function reportEvidenceForStudent(courseName, studentName, assessmentData) {
+    return [
+      ...assignmentEvidenceForStudent(courseName, studentName),
+      ...testQuizEvidenceForStudent(courseName, studentName, assessmentData)
+    ];
+  }
+
+  function runningMarkForEvidence(evidence) {
+    if (!evidence.length) return null;
+    return evidence.reduce((total, item) => total + item.percentage, 0) / evidence.length;
+  }
+
   function ensureSelections() {
     const courses = activeCourses();
     const available = courses.map((course) => course.name);
@@ -926,6 +1008,7 @@
     const activeAssignments = assignmentsFor(courseName).filter((assignment) => !assignment.markedHandedBack);
     const handedBackAssignments = assignmentsFor(courseName).filter((assignment) => assignment.markedHandedBack);
     const reportAssignments = [...activeAssignments, ...handedBackAssignments];
+    const assessmentData = window.teacherCommandCentreAssessments?.exportData?.() || { classes: {} };
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
@@ -941,7 +1024,10 @@
           return !row.submitted && !row.notRequired;
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
         const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
-        return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
+        const evidence = reportEvidenceForStudent(courseName, student, assessmentData);
+        const runningMark = runningMarkForEvidence(evidence);
+        const evidenceLabel = evidence.length === 1 ? 'marked item' : 'marked items';
+        return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'No marked work yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
       }).join('') : '<p class="empty-copy">No students are on this active roster.</p>';
     }
 
@@ -953,6 +1039,10 @@
 
     const record = ensureRecord(courseName, selectedStudent);
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
+    const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData);
+    const runningMark = runningMarkForEvidence(evidence);
+    const evidenceLabel = evidence.length === 1 ? 'marked item' : 'marked items';
+    const evidenceRows = evidence.map((item) => '<li class="report-assignment report-evidence"><span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.detail) + '</small></span><span class="chip success">' + formatPercentage(item.percentage) + '</span></li>');
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
     const assignmentRows = reportAssignments.map((assignment) => {
       const row = normalizeSubmission(assignment.students?.[selectedStudent]);
@@ -969,7 +1059,7 @@
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section"><h4>Assignments</h4><p class="panel-help">Marked &amp; Handed Back work stays here with its recorded mark.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div><p>' + (evidence.length ? 'Average of ' + evidence.length + ' ' + evidenceLabel + '. N/A and unmarked work are excluded.' : 'No marked assignments, tests, or quizzes have been entered yet.') + '</p></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Only entered marks count in the running mark. Level results use the agreed percentage scale; R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
     
   }
 
@@ -1706,6 +1796,9 @@
     state = loadState();
     ensureSelections();
     save(migratedLegacyData ? 'Local data migrated safely' : 'Local-first dashboard ready');
+    window.addEventListener('teacher-command-centre-assessments-updated', () => {
+      if (ui.view === 'reports') renderReports();
+    });
     document.addEventListener('click', handleClick);
     document.addEventListener('change', handleChange);
     document.addEventListener('submit', handleSubmit);
