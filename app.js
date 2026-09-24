@@ -1062,13 +1062,17 @@
 
   function showAddAssignment(courseName = ui.assignmentCourse) {
     if (!findCourse(courseName)) return;
-    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${todayISO()}" required></label><label>Due date<input type="date" name="due" aria-label="Assignment due date" title="Choose the due date from the calendar"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
+    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row">${dateField('Assigned', 'assigned', todayISO(), true)}${dateField('Due date', 'due')}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
   }
 
   function showEditAssignment(courseName, assignmentId) {
     const assignment = findAssignment(courseName, assignmentId);
     if (!assignment) return;
-    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row"><label>Assigned<input type="date" name="assigned" value="${assignment.assigned}"></label><label>Due date<input type="date" name="due" value="${assignment.due}" aria-label="Assignment due date" title="Choose the due date from the calendar"></label></div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
+    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row">${dateField('Assigned', 'assigned', assignment.assigned, true)}${dateField('Due date', 'due', assignment.due)}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
+  }
+
+  function dateField(label, name, value = '', required = false) {
+    return `<label>${label}<span class="date-control"><input type="date" name="${name}" value="${escapeAttr(value)}" ${required ? 'required' : ''} aria-label="${escapeAttr(label)}"><button type="button" class="date-picker-button" data-action="open-date-picker" data-date-input="${name}" aria-label="Open calendar for ${escapeAttr(label)}">📅 <span>Choose</span></button></span></label>`;
   }
 
   function showAddNote(courseName = ui.notesCourse, studentName = ui.notesStudent) {
@@ -1452,6 +1456,14 @@
     event.preventDefault();
     switch (action) {
       case 'close-modal': closeModal(); break;
+      case 'open-date-picker': {
+        const dateInput = target.closest('.modal')?.querySelector(`input[name="${target.dataset.dateInput}"]`);
+        if (!dateInput) break;
+        dateInput.focus({ preventScroll: true });
+        if (typeof dateInput.showPicker === 'function') dateInput.showPicker();
+        else dateInput.click();
+        break;
+      }
       case 'open-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
       case 'open-attendance-course': setCurrentClass(target.dataset.course); showView('attendance'); break;
       case 'open-assignments-course': setCurrentClass(target.dataset.course); showView('assignments'); break;
