@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 20;
+  const APP_VERSION = 21;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -225,6 +225,17 @@
     return ACHIEVEMENT_LEVELS.map((level) => `<option value="${level}" ${level === selected ? 'selected' : ''}>${level || '—'}</option>`).join('');
   }
 
+  function completionOptions(selected) {
+    return [['', '— Not assessed'], ['pass', 'Pass · Level 4'], ['incomplete', 'Incomplete']]
+      .map(([value, label]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('');
+  }
+
+  function submissionForAssignment(assignment, studentName) {
+    const row = normalizeSubmission(assignment.students?.[studentName]);
+    if (assignment.grading === 'completion') row.submitted = row.completionResult === 'pass';
+    return row;
+  }
+
   function makeId(prefix) {
     if (window.crypto?.randomUUID) return `${prefix}-${window.crypto.randomUUID()}`;
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -285,6 +296,7 @@
     const mark = source.mark ?? source.achievement ?? '';
     return {
       ...source,
+      completionResult: ['pass', 'incomplete'].includes(source.completionResult) ? source.completionResult : '',
       submitted: Boolean(source.submitted),
       mark: String(mark ?? ''),
       achievement: String(source.achievement ?? mark ?? ''),
@@ -511,15 +523,19 @@
 
   function assignmentEvidenceForStudent(courseName, studentName) {
     return assignmentsFor(courseName).map((assignment) => {
-      const row = normalizeSubmission(assignment.students?.[studentName]);
+      const row = submissionForAssignment(assignment, studentName);
       if (row.notRequired) return null;
-      const percentage = assignment.grading === 'levels'
+      const percentage = assignment.grading === 'completion'
+        ? (row.completionResult === 'pass' ? ACHIEVEMENT_PERCENTAGES['4'] : null)
+        : assignment.grading === 'levels'
         ? percentageFromAchievement(row.mark)
         : percentageFromNumericMark(row.mark, assignment.maxMark);
       if (percentage === null) return null;
 
       const mark = text(row.mark);
-      const markDetail = assignment.grading === 'levels'
+      const markDetail = assignment.grading === 'completion'
+        ? 'Completion · Pass · Level 4'
+        : assignment.grading === 'levels'
         ? `Assignment · Level ${mark}`
         : `Assignment · ${mark}/${assignment.maxMark}`;
       const date = assignment.due || assignment.assigned;
@@ -527,8 +543,9 @@
       const status = assignment.markedHandedBack ? 'Handed back · ' : '';
       return {
         name: assignment.name,
+        category: assignment.grading === 'completion' || assignment.participationEvidence ? 'participation' : 'classroom',
         percentage,
-        detail: status + markDetail + dateDetail
+        detail: (assignment.grading === 'completion' || assignment.participationEvidence ? 'Participation · ' : 'Classroom work · ') + status + markDetail + dateDetail
       };
     }).filter(Boolean);
   }
@@ -537,6 +554,7 @@
     const assessments = asArray(assessmentData?.classes?.[courseName]?.assessments);
     return assessments.map((assessment) => {
       const row = isObject(assessment?.students?.[studentName]) ? assessment.students[studentName] : null;
+      if (row?.notRequired) return null;
       const mark = text(row?.mark);
       const maximum = Number(assessment?.maxMark) || 100;
       const percentage = percentageFromNumericMark(mark, maximum);
@@ -546,6 +564,7 @@
       const date = validDate(assessment?.date) ? ` · ${formatShortDate(assessment.date)}` : '';
       const status = assessment?.archived ? 'Archived · ' : '';
       return {
+        category: 'classroom',
         name: text(assessment?.name) || 'Untitled test / quiz',
         percentage,
         detail: status + type + ` · ${mark}/${maximum}` + date
@@ -556,13 +575,42 @@
   function reportEvidenceForStudent(courseName, studentName, assessmentData) {
     return [
       ...assignmentEvidenceForStudent(courseName, studentName),
-      ...testQuizEvidenceForStudent(courseName, studentName, assessmentData)
+      ...testQuizEvidenceForStudent(courseName, studentName, assessmentData),
+      ...participationEvidenceForStudent(ensureRecord(courseName, studentName))
     ];
   }
 
+  function participationEvidenceForStudent(record) {
+    const history = normalizeParticipationHistory(record.participationHistory);
+    // A prior undated level is a fallback, never a duplicate of dated evidence.
+    const entries = history.length ? history : (record.participation ? [{ level: record.participation }] : []);
+    return entries.map((entry) => ({
+      name: entry.date ? `Participation · ${formatShortDate(entry.date)}` : 'Prior participation',
+      detail: `Attendance/Participation · Level ${entry.level}`,
+      category: 'participation',
+      percentage: percentageFromAchievement(String(entry.level))
+    })).filter((entry) => entry.percentage !== null);
+  }
+
+  function averageEvidence(evidence) {
+    return evidence.length ? evidence.reduce((total, item) => total + item.percentage, 0) / evidence.length : null;
+  }
+
   function runningMarkForEvidence(evidence) {
-    if (!evidence.length) return null;
-    return evidence.reduce((total, item) => total + item.percentage, 0) / evidence.length;
+    const classroom = averageEvidence(evidence.filter((item) => item.category === 'classroom'));
+    const participation = averageEvidence(evidence.filter((item) => item.category === 'participation'));
+    const weight = (classroom === null ? 0 : 65) + (participation === null ? 0 : 15);
+    return weight ? ((classroom ?? 0) * 65 + (participation ?? 0) * 15) / weight : null;
+  }
+
+  function runningMarkExplanation(evidence) {
+    const classroom = averageEvidence(evidence.filter((item) => item.category === 'classroom'));
+    const participation = averageEvidence(evidence.filter((item) => item.category === 'participation'));
+    const summary = `Classroom work (65%): ${formatPercentage(classroom)} · Attendance/Participation (15%): ${formatPercentage(participation)}.`;
+    const calculation = classroom !== null && participation !== null
+      ? ' Running mark = (Classroom work × 65 + Participation × 15) ÷ 80.'
+      : ' Only the assessed component counts until both have evidence.';
+    return summary + calculation + ' The 20% final is not included yet. Blank days, N/A and Incomplete are not zeroes.';
   }
 
   function ensureSelections() {
@@ -668,15 +716,6 @@
     return asArray(record?.participationHistory).find((entry) => entry.date === date)?.level || null;
   }
 
-  function participationSummary(record) {
-    const history = asArray(record?.participationHistory);
-    if (history.length) {
-      const average = history.reduce((total, entry) => total + entry.level, 0) / history.length;
-      return `${average.toFixed(1)} avg · ${history.length} day${history.length === 1 ? '' : 's'}`;
-    }
-    return record?.participation ? `L${record.participation} prior` : '—';
-  }
-
   function setParticipation(courseName, studentName, date, level) {
     if (!findCourse(courseName) || !activeStudents(courseName).includes(studentName) || !validDate(date) || ![1, 2, 3, 4].includes(level)) return;
     const record = ensureRecord(courseName, studentName);
@@ -701,7 +740,7 @@
     let notRequired = 0;
     let missing = 0;
     students.forEach((student) => {
-      const status = normalizeSubmission(assignment.students?.[student]);
+      const status = submissionForAssignment(assignment, student);
       if (status.notRequired) notRequired += 1;
       else if (status.submitted) submitted += 1;
       else missing += 1;
@@ -721,7 +760,7 @@
       });
       assignmentsFor(course.name).filter((assignment) => !assignment.markedHandedBack).forEach((assignment) => {
         course.students.forEach((student) => {
-          const row = normalizeSubmission(assignment.students?.[student]);
+          const row = submissionForAssignment(assignment, student);
           if (!row.submitted && !row.notRequired) {
             items.push({ type: 'assignment', course: course.name, student, name: assignment.name, status: assignment.due && assignment.due < todayISO() ? 'Overdue' : 'Missing', due: assignment.due, id: assignment.id });
           }
@@ -729,18 +768,6 @@
       });
     });
     return items;
-  }
-
-  function countAllRecords() {
-    let students = 0;
-    let attendance = 0;
-    Object.values(state.studentData.students || {}).forEach((course) => {
-      Object.values(course || {}).forEach((record) => {
-        students += 1;
-        attendance += asArray(record?.attendance).length;
-      });
-    });
-    return { students, attendance };
   }
 
   function currentDayNumber() {
@@ -956,8 +983,8 @@
       return `<article class="assignment-card">
         <div>
           <h3>${escapeHtml(assignment.name)}</h3>
-          <p class="assignment-meta">Assigned ${escapeHtml(formatShortDate(assignment.assigned))}${assignment.due ? ` · Due ${escapeHtml(formatShortDate(assignment.due))}` : ''} · ${escapeHtml(assignment.grading === 'marks' ? `${assignment.maxMark} marks` : `Level ${assignment.maxMark}`)}</p>
-          <div class="assignment-stats"><span class="chip success">${stats.submitted} submitted</span><span class="chip warning">${stats.missing} open</span>${stats.notRequired ? `<span class="chip">${stats.notRequired} N/A</span>` : ''}${assignment.participationEvidence ? '<span class="chip">Participation evidence</span>' : ''}${assignment.formativeClasswork ? '<span class="chip">Formative</span>' : ''}</div>
+          <p class="assignment-meta">Assigned ${escapeHtml(formatShortDate(assignment.assigned))}${assignment.due ? ` · Due ${escapeHtml(formatShortDate(assignment.due))}` : ''} · ${escapeHtml(assignment.grading === 'completion' ? 'Pass / Incomplete' : assignment.grading === 'marks' ? `${assignment.maxMark} marks` : `Level ${assignment.maxMark}`)}</p>
+          <div class="assignment-stats"><span class="chip success">${stats.submitted} submitted</span><span class="chip warning">${stats.missing} open</span>${stats.notRequired ? `<span class="chip">${stats.notRequired} N/A</span>` : ''}${assignment.participationEvidence || assignment.grading === 'completion' ? '<span class="chip">Participation evidence</span>' : ''}${assignment.formativeClasswork ? '<span class="chip">Formative</span>' : ''}</div>
         </div>
         <div class="assignment-actions"><button type="button" class="secondary-button" data-action="open-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">${ui.selectedAssignmentId === assignment.id ? 'Open' : 'Details'}</button><button type="button" class="secondary-button" data-action="edit-assignment" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}">Edit</button></div>
       </article>`;
@@ -974,13 +1001,15 @@
     }
     const course = findCourse(courseName);
     const rows = course.students.map((student) => {
-      const row = normalizeSubmission(assignment.students?.[student]);
-      const achievementControl = assignment.grading === 'levels'
+      const row = submissionForAssignment(assignment, student);
+      const achievementControl = assignment.grading === 'completion'
+        ? `<select data-assignment-field="completionResult" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} completion">${completionOptions(row.completionResult)}</select>`
+        : assignment.grading === 'levels'
         ? `<select data-assignment-field="mark" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} achievement">${achievementOptions(row.mark)}</select>`
         : `<input type="number" min="0" max="${assignment.maxMark}" step="0.5" value="${escapeAttr(row.mark)}" data-assignment-field="mark" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} mark">`;
-      return `<tr class="${row.submitted || row.notRequired ? 'submitted-row' : 'missing-row'}"><td><strong>${escapeHtml(student)}</strong></td><td><input type="checkbox" data-assignment-field="submitted" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.submitted ? 'checked' : ''} aria-label="${escapeAttr(student)} submitted"></td><td><input type="checkbox" data-assignment-field="notRequired" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.notRequired ? 'checked' : ''} aria-label="${escapeAttr(student)} not required"></td><td>${achievementControl}</td><td><input type="text" value="${escapeAttr(row.note)}" data-assignment-field="note" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} note"></td></tr>`;
+      return `<tr class="${row.submitted || row.notRequired ? 'submitted-row' : 'missing-row'}"><td><strong>${escapeHtml(student)}</strong></td><td><input type="checkbox" data-assignment-field="submitted" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.submitted ? 'checked' : ''} ${assignment.grading === 'completion' ? 'disabled' : ''} aria-label="${escapeAttr(student)} submitted"></td><td><input type="checkbox" data-assignment-field="notRequired" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" ${row.notRequired ? 'checked' : ''} aria-label="${escapeAttr(student)} not required"></td><td>${achievementControl}</td><td><input type="text" value="${escapeAttr(row.note)}" data-assignment-field="note" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" data-student="${escapeAttr(student)}" aria-label="${escapeAttr(student)} note"></td></tr>`;
     }).join('');
-    host.innerHTML = `<section class="detail-panel"><h3>${escapeHtml(assignment.name)}</h3><p class="assignment-meta">Current active roster only. Historical student entries remain in the data but are not re-added to this class.</p><div class="detail-controls"><label><input type="checkbox" data-assignment-toggle="participationEvidence" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.participationEvidence ? 'checked' : ''}> Participation evidence</label><label><input type="checkbox" data-assignment-toggle="formativeClasswork" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.formativeClasswork ? 'checked' : ''}> Formative classroom work</label><label class="handback-control"><input type="checkbox" data-assignment-toggle="markedHandedBack" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.markedHandedBack ? 'checked' : ''}> Marked &amp; Handed Back</label></div><div class="table-wrap"><table class="data-table detail-table"><thead><tr><th>Student</th><th>Submitted</th><th>N/A</th><th>${assignment.grading === 'levels' ? 'Achievement' : 'Mark'}</th><th>Note</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No active students are on this roster.</td></tr>'}</tbody></table></div></section>`;
+    host.innerHTML = `<section class="detail-panel"><h3>${escapeHtml(assignment.name)}</h3><p class="assignment-meta">${assignment.grading === 'completion' ? 'Pass gives Level 4 participation evidence; Incomplete remains open and is not a zero.' : 'Current active roster only.'}</p><div class="detail-controls"><label><input type="checkbox" data-assignment-toggle="participationEvidence" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.participationEvidence || assignment.grading === 'completion' ? 'checked' : ''} ${assignment.grading === 'completion' ? 'disabled' : ''}> Participation evidence (15% component)</label><label><input type="checkbox" data-assignment-toggle="formativeClasswork" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.formativeClasswork ? 'checked' : ''}> Formative classroom work</label><label class="handback-control"><input type="checkbox" data-assignment-toggle="markedHandedBack" data-course="${escapeAttr(courseName)}" data-assignment-id="${escapeAttr(assignment.id)}" ${assignment.markedHandedBack ? 'checked' : ''}> Marked &amp; Handed Back</label></div><div class="table-wrap"><table class="data-table detail-table"><thead><tr><th>Student</th><th>Submitted</th><th>N/A</th><th>${assignment.grading === 'completion' ? 'Completion' : assignment.grading === 'levels' ? 'Achievement' : 'Mark'}</th><th>Note</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty-copy">No active students are on this roster.</td></tr>'}</tbody></table></div></section>`;
   }
 
 
@@ -1020,14 +1049,14 @@
       cards.innerHTML = course.students.length ? course.students.map((student) => {
         const record = ensureRecord(courseName, student);
         const open = activeAssignments.filter((assignment) => {
-          const row = normalizeSubmission(assignment.students?.[student]);
+          const row = submissionForAssignment(assignment, student);
           return !row.submitted && !row.notRequired;
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
         const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
         const evidence = reportEvidenceForStudent(courseName, student, assessmentData);
         const runningMark = runningMarkForEvidence(evidence);
-        const evidenceLabel = evidence.length === 1 ? 'marked item' : 'marked items';
-        return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'No marked work yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
+        const evidenceLabel = evidence.length === 1 ? 'evidence item' : 'evidence items';
+        return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'Not assessed yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
       }).join('') : '<p class="empty-copy">No students are on this active roster.</p>';
     }
 
@@ -1041,25 +1070,26 @@
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
     const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData);
     const runningMark = runningMarkForEvidence(evidence);
-    const evidenceLabel = evidence.length === 1 ? 'marked item' : 'marked items';
     const evidenceRows = evidence.map((item) => '<li class="report-assignment report-evidence"><span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.detail) + '</small></span><span class="chip success">' + formatPercentage(item.percentage) + '</span></li>');
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
     const assignmentRows = reportAssignments.map((assignment) => {
-      const row = normalizeSubmission(assignment.students?.[selectedStudent]);
+      const row = submissionForAssignment(assignment, selectedStudent);
       const status = assignment.markedHandedBack ? 'Handed back' : (row.notRequired ? 'N/A' : row.submitted ? 'Complete' : (assignment.due && assignment.due < todayISO() ? 'Overdue' : 'Missing'));
       const statusClass = assignment.markedHandedBack ? 'handed-back' : (status === 'Complete' || status === 'N/A' ? 'success' : 'warning');
       const due = assignment.due ? 'Due ' + formatShortDate(assignment.due) : 'No due date';
-      const mark = text(row.mark) ? ' · Mark: ' + row.mark : '';
+      const mark = assignment.grading === 'completion'
+        ? ' · Completion: ' + (row.completionResult === 'pass' ? 'Pass · Level 4' : row.completionResult === 'incomplete' ? 'Incomplete' : 'Not assessed')
+        : text(row.mark) ? ' · Mark: ' + row.mark : '';
       return '<li class="report-assignment"><span><strong>' + escapeHtml(assignment.name) + '</strong><small>' + escapeHtml(due + mark) + '</small></span><span class="chip ' + statusClass + '">' + status + '</span></li>';
     });
     const assignmentItems = [...missingLegacy, ...assignmentRows].join('');
-    const submitted = activeAssignments.filter((assignment) => normalizeSubmission(assignment.students?.[selectedStudent]).submitted).length;
+    const submitted = activeAssignments.filter((assignment) => submissionForAssignment(assignment, selectedStudent).submitted).length;
     const outstanding = activeAssignments.filter((assignment) => {
-      const row = normalizeSubmission(assignment.students?.[selectedStudent]);
+      const row = submissionForAssignment(assignment, selectedStudent);
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div><p>' + (evidence.length ? 'Average of ' + evidence.length + ' ' + evidenceLabel + '. N/A and unmarked work are excluded.' : 'No marked assignments, tests, or quizzes have been entered yet.') + '</p></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Only entered marks count in the running mark. Level results use the agreed percentage scale; R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div><p>' + escapeHtml(runningMarkExplanation(evidence)) + '</p></div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Entered marks and participation evidence use the agreed level scale. Pass is Level 4 (85%) in participation only. R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
     
   }
 
@@ -1152,13 +1182,13 @@
 
   function showAddAssignment(courseName = ui.assignmentCourse) {
     if (!findCourse(courseName)) return;
-    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row">${dateField('Assigned', 'assigned', todayISO(), true)}${dateField('Due date', 'due')}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
+    showModal(`<h2>Add Assignment</h2><p>Create the item once; the active roster is added automatically.</p><form id="assignmentForm" class="modal-form"><label>Class<select name="course">${courseOptions(courseName)}</select></label><label>Assignment name<input name="name" required autocomplete="off" placeholder="e.g. Communities You Belong To"></label><div class="modal-row">${dateField('Assigned', 'assigned', todayISO(), true)}${dateField('Due date', 'due')}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels">Levels</option><option value="marks">Marks</option><option value="completion">Pass / Incomplete (participation)</option></select></label><label>Maximum (levels / marks only)<input type="number" name="maxMark" min="1" value="4" required></label></div><div class="modal-row"><label><input type="checkbox" name="participationEvidence"> Participation evidence (15% component)</label><label><input type="checkbox" name="formativeClasswork"> Formative classroom work</label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Add Assignment</button></div></form>`);
   }
 
   function showEditAssignment(courseName, assignmentId) {
     const assignment = findAssignment(courseName, assignmentId);
     if (!assignment) return;
-    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row">${dateField('Assigned', 'assigned', assignment.assigned, true)}${dateField('Due date', 'due', assignment.due)}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option></select></label><label>Maximum<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
+    showModal(`<h2>Edit Assignment</h2><form id="assignmentEditForm" class="modal-form"><input type="hidden" name="course" value="${escapeAttr(courseName)}"><input type="hidden" name="assignmentId" value="${escapeAttr(assignment.id)}"><label>Assignment name<input name="name" required value="${escapeAttr(assignment.name)}"></label><div class="modal-row">${dateField('Assigned', 'assigned', assignment.assigned, true)}${dateField('Due date', 'due', assignment.due)}</div><div class="modal-row"><label>Grading<select name="grading"><option value="levels" ${assignment.grading === 'levels' ? 'selected' : ''}>Levels</option><option value="marks" ${assignment.grading === 'marks' ? 'selected' : ''}>Marks</option><option value="completion" ${assignment.grading === 'completion' ? 'selected' : ''}>Pass / Incomplete (participation)</option></select></label><label>Maximum (levels / marks only)<input type="number" name="maxMark" min="1" value="${assignment.maxMark}"></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Save Changes</button></div></form>`);
   }
 
   function dateField(label, name, value = '', required = false) {
@@ -1506,7 +1536,9 @@
     const row = assignment.students[studentName];
     const field = target.dataset.assignmentField;
     if (field === 'submitted' || field === 'notRequired') row[field] = target.checked;
-    else if (field === 'mark') {
+    else if (field === 'completionResult' && assignment.grading === 'completion') {
+      row.completionResult = ['pass', 'incomplete'].includes(target.value) ? target.value : '';
+    } else if (field === 'mark') {
       row.mark = target.value;
       row.achievement = target.value;
       if (text(target.value)) row.submitted = true;

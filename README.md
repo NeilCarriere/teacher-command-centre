@@ -24,3 +24,9 @@ The active course roster remains authoritative. Participation levels are recorde
 - `styles.css` — chalkboard / wood-frame interface
 - `app.js` — application logic, persistence, migration, roster sorting, assignment tracking, and backup handling
 - `assessments.js` — tests and quizzes with editable results
+
+## Running marks (Grade 9–10)
+
+Reports average classroom evidence and participation evidence separately, then use `(classroom × 65 + participation × 15) / 80` before the 20% final. When only one component has evidence, that component is shown provisionally. Blank days, unmarked work and N/A do not become zeroes. Dated participation uses the agreed level percentages; an undated prior level is used only when dated entries are absent. Attendance totals remain visible but do not automatically create a mark.
+
+Choose **Pass / Incomplete (participation)** when adding or editing an assignment. Pass contributes Level 4 (85%) to participation only; Incomplete remains open with no numeric mark. Existing assignments keep their grading mode. Assignments explicitly flagged as participation evidence contribute to the 15% component rather than being counted twice. Completion results are stored separately so changing grading modes preserves earlier marks. Backup version 21 preserves completion results and remains able to restore older backups.
