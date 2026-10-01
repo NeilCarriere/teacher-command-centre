@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 21;
+  const APP_VERSION = 22;
   const STORAGE_KEY = 'teacher_command_centre_v15';
   const PRE_IMPORT_KEY = 'teacher_command_centre_v15_before_import';
   const LEGACY_KEYS = {
@@ -581,15 +581,24 @@
   }
 
   function participationEvidenceForStudent(record) {
+    const attendance = new Map(normalizeAttendance(record.attendance).map(entry => [entry.date, entry.status]));
     const history = normalizeParticipationHistory(record.participationHistory);
-    // A prior undated level is a fallback, never a duplicate of dated evidence.
+    // Preserve recorded levels; attendance changes only the calculated evidence.
     const entries = history.length ? history : (record.participation ? [{ level: record.participation }] : []);
-    return entries.map((entry) => ({
+    const evidence = entries.filter(entry => !['A', 'E'].includes(attendance.get(entry.date))).map(entry => ({
       name: entry.date ? `Participation · ${formatShortDate(entry.date)}` : 'Prior participation',
       detail: `Attendance/Participation · Level ${entry.level}`,
       category: 'participation',
       percentage: percentageFromAchievement(String(entry.level))
-    })).filter((entry) => entry.percentage !== null);
+    })).filter(entry => entry.percentage !== null);
+    attendance.forEach((status, date) => {
+      if (status === 'A') evidence.push({
+        name: `Unexcused absence · ${formatShortDate(date)}`,
+        detail: 'Attendance/Participation · Unexcused absence · 0%',
+        category: 'participation', percentage: 0
+      });
+    });
+    return evidence;
   }
 
   function averageEvidence(evidence) {
@@ -610,7 +619,7 @@
     const calculation = classroom !== null && participation !== null
       ? ' Running mark = (Classroom work × 65 + Participation × 15) ÷ 80.'
       : ' Only the assessed component counts until both have evidence.';
-    return summary + calculation + ' The 20% final is not included yet. Blank days, N/A and Incomplete are not zeroes.';
+    return summary + calculation + ' The 20% final is not included yet. Unexcused absences count as 0% participation for that day; excused days are excluded. Blank days, N/A and Incomplete are not zeroes.';
   }
 
   function ensureSelections() {
@@ -819,7 +828,7 @@
     if (!courses.length) {
       cards.innerHTML = '';
       empty.classList.remove('hidden');
-      empty.innerHTML = `<h2>Start with your existing backup.</h2><p>This cleaned version stores no student names in the public source. Restore the backup you already use, or create a class and roster from the Manage Classes page.</p><button type="button" class="primary-button" data-action="open-import">Restore Backup File</button> <button type="button" class="secondary-button" data-view="manage">Manage Classes</button>`;
+      empty.innerHTML = `<h2>Start with your existing backup.</h2><p>This cleaned version stores no student names in the public source. Restore the backup you already use, or create a class and roster from the Manage Classes page.</p><button type="button" class="primary-button" data-action="paste-backup">Paste Backup</button> <button type="button" class="secondary-button" data-view="manage">Manage Classes</button>`;
       return;
     }
     empty.classList.add('hidden');
@@ -873,26 +882,6 @@
     byId('quickRoster').innerHTML = `<thead><tr><th>#</th><th>Student</th><th>Attendance</th><th>Participation<br><small>${escapeHtml(formatShortDate(ui.selectedDate))}</small></th><th>Work</th><th>A + E</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-copy">No students are on this active roster yet.</td></tr>'}</tbody>`;
   }
 
-  function renderThresholdSummary() {
-    const counts = Object.fromEntries(THRESHOLDS.map((threshold) => [threshold, 0]));
-    activeCourses().forEach((course) => course.students.forEach((student) => {
-      const total = countAbsences(ensureRecord(course.name, student));
-      THRESHOLDS.forEach((threshold) => { if (total >= threshold) counts[threshold] += 1; });
-    }));
-    byId('attendanceAlertSummary').innerHTML = THRESHOLDS.map((threshold) => `<div class="threshold t${threshold}"><strong>${counts[threshold]}</strong><span>${threshold} A + E</span></div>`).join('');
-  }
-
-  function renderMissingSummary() {
-    const items = allMissingItems();
-    const perCourse = activeCourses().map((course) => ({
-      name: course.name,
-      count: items.filter((item) => item.course === course.name).length
-    }));
-    byId('missingSummary').innerHTML = perCourse.length
-      ? perCourse.map((entry) => `<div class="compact-item"><span>${escapeHtml(entry.name)}</span><span class="count">${entry.count}</span></div>`).join('')
-      : '<p class="empty-copy">No active classes yet.</p>';
-  }
-
   function renderReminders() {
     const reminders = [...state.reminders].sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt.localeCompare(b.createdAt));
     byId('reminderList').innerHTML = reminders.length
@@ -904,8 +893,6 @@
     renderCommandStrip();
     renderClassCards();
     renderQuickRoster();
-    renderThresholdSummary();
-    renderMissingSummary();
     renderReminders();
   }
 
@@ -1121,7 +1108,7 @@
       return;
     }
     notice.classList.remove('hidden');
-    notice.textContent = 'Your existing local dashboard data was safely migrated into the cleaned v17 format. Current active rosters are authoritative; students no longer on a roster are cleared from the dashboard data.';
+    notice.textContent = 'Your existing local dashboard data was safely migrated into the current format. Current active rosters are authoritative; students no longer on a roster are cleared from the dashboard data.';
   }
 
   function renderAll() {
@@ -1278,60 +1265,57 @@
     const extracted = extractBackup(parsed);
     const summary = backupSummary(extracted);
     pendingImport = extracted;
-    showModal(`<h2>Restore this backup?</h2><p>${escapeHtml(summary)}</p><p>This replaces the current dashboard data on this device. A local pre-import recovery copy will be kept first.</p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="button" class="primary-button" data-action="confirm-import">Restore Backup</button></div>`);
+    showModal(`<h2>Restore this backup?</h2><p>${escapeHtml(summary)}</p><p>This replaces the current dashboard data on this device. A local pre-import recovery copy will be kept first.</p><p id="importStatus" role="status"></p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="button" class="primary-button" data-action="confirm-import">Restore Backup</button></div>`);
   }
 
   function performImport() {
     if (!pendingImport) return;
-    const importedAssessments = pendingImport.assessments;
-    writeLocal(PRE_IMPORT_KEY, state);
-    state = normalizeState(pendingImport);
-    if (importedAssessments && window.teacherCommandCentreAssessments?.importData) {
-      window.teacherCommandCentreAssessments.importData(importedAssessments);
+    const assessmentKey = 'teacher_command_centre_assessments_v1';
+    const previousApp = localStorage.getItem(STORAGE_KEY);
+    const previousAssessments = localStorage.getItem(assessmentKey);
+    const next = normalizeState(pendingImport);
+    const nextAssessments = pendingImport.assessments || { classes: {} };
+    try {
+      // Keep a complete recovery copy before changing either storage bucket.
+      localStorage.setItem(PRE_IMPORT_KEY, JSON.stringify(exportPayload()));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(assessmentKey, JSON.stringify(nextAssessments));
+      if (localStorage.getItem(STORAGE_KEY) !== JSON.stringify(next) ||
+          localStorage.getItem(assessmentKey) !== JSON.stringify(nextAssessments)) {
+        throw new Error('The browser did not retain the complete backup.');
+      }
+    } catch (error) {
+      try {
+        if (previousApp === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, previousApp);
+        if (previousAssessments === null) localStorage.removeItem(assessmentKey);
+        else localStorage.setItem(assessmentKey, previousAssessments);
+      } catch (_) { /* The pre-import recovery copy remains available. */ }
+      const message = byId('importStatus');
+      if (message) message.textContent = 'Backup not restored: ' + error.message;
+      return;
     }
-    migratedLegacyData = false;
-    pendingImport = null;
-    ensureSelections();
-    const saved = save('Backup restored locally');
-    if (!saved) throw new Error('The browser could not save the restored backup locally.');
-    closeModal();
-    const restoreBox = byId('restorePayload');
-    if (restoreBox) restoreBox.value = '';
-    ui.view = 'dashboard';
-    renderAll();
-    const status = byId('saveStatus');
-    if (status) status.textContent = '✓ Backup restored — latest pasted data is active';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function downloadBackup() {
-    const body = exportText();
-    const blob = new Blob([body], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    anchor.href = url;
-    anchor.download = `teacher-command-centre-backup-${stamp}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-    byId('backupStatus').textContent = 'Backup file downloaded. Keep it as a recovery point.';
+    // Reload both modules from the verified persisted data, on Home.
+    location.reload();
   }
 
   async function copyBackup() {
     const payload = exportText();
     const box = byId('backupPayload');
     box.value = payload;
+    const fallback = byId('backupCopyFallback');
+    fallback.classList.add('hidden');
     let copied = false;
     try {
       await navigator.clipboard.writeText(payload);
       copied = true;
     } catch (_) {
+      fallback.classList.remove('hidden');
       box.focus();
       box.select();
       try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
     }
+    fallback.classList.toggle('hidden', copied);
     byId('backupStatus').textContent = copied
       ? 'Copied. Return to this ChatGPT conversation and paste the complete data.'
       : 'Automatic copy was blocked. The full export is in the box below—select all, copy, then paste it here.';
@@ -1372,55 +1356,16 @@
     }
   }
 
-  function restorePastedBackup() {
-    const box = byId('restorePayload');
-    try {
-      const parsed = parsePastedBackup(box?.value || '');
-      pendingImport = extractBackup(parsed);
-      performImport();
-    } catch (error) {
-      pendingImport = null;
-      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
-      box?.focus();
-    }
-  }
-
-  async function pasteFromClipboard() {
+  async function openPasteBackup() {
+    showModal(`<h2>Paste Backup</h2><p>Paste the complete backup below, then restore it after checking the preview.</p><form id="pasteBackupForm" class="modal-form"><label>Backup text<textarea id="restorePayload" required spellcheck="false" placeholder="Paste the complete backup here…"></textarea></label><p id="pasteStatus" role="status"></p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-modal">Cancel</button><button type="submit" class="primary-button">Preview Backup</button></div></form>`);
     const box = byId('restorePayload');
     try {
       const value = await navigator.clipboard.readText();
-      if (!value) throw new Error('The clipboard is empty.');
-      box.value = value;
-      box.focus();
-      byId('backupStatus').textContent = 'Backup pasted from the clipboard. Review it, then choose Restore Pasted Data.';
+      if (box.isConnected && !box.value && value) box.value = value;
     } catch (_) {
-      box?.focus();
-      byId('backupStatus').textContent = 'Clipboard access was blocked. Tap the box and paste the backup manually.';
+      if (box.isConnected) byId('pasteStatus').textContent = 'Tap the box and paste your backup.';
     }
-  }
-
-
-  async function pasteAndPreviewBackup() {
-    const box = byId('restorePayload');
-    let value = '';
-    try {
-      value = await navigator.clipboard.readText();
-    } catch (_) {
-      box?.focus();
-      byId('backupStatus').textContent = 'Clipboard access was blocked. Paste the backup into the box manually, then choose Restore Pasted Data.';
-      return;
-    }
-    if (!value) {
-      byId('backupStatus').textContent = 'The clipboard is empty.';
-      return;
-    }
-    if (box) box.value = value;
-    try {
-      previewImport(parsePastedBackup(value));
-    } catch (error) {
-      byId('backupStatus').textContent = 'Backup not ready: ' + (error.message || 'The pasted data could not be read.');
-      box?.focus();
-    }
+    if (box.isConnected) box.focus();
   }
 
   function createCourse(courseName) {
@@ -1453,6 +1398,7 @@
     }
     Object.keys(ui).forEach((key) => { if (ui[key] === oldName) ui[key] = next; });
     if (state.currentClass === oldName) state.currentClass = next;
+    window.teacherCommandCentreAssessments?.renameCourse(oldName, next);
     save('Class renamed');
   }
 
@@ -1508,6 +1454,7 @@
       }
     });
     if (ui.notesStudent === oldName && ui.notesCourse === courseName) ui.notesStudent = next;
+    window.teacherCommandCentreAssessments?.renameStudent(courseName, oldName, next);
     save('Student renamed');
   }
 
@@ -1524,6 +1471,7 @@
     });
     if (ui.notesCourse === courseName && ui.notesStudent === studentName) ui.notesStudent = '';
     ensureSelections();
+    window.teacherCommandCentreAssessments?.removeStudent(courseName, studentName);
     save('Student and related records removed');
   }
 
@@ -1649,12 +1597,8 @@
         }
         break;
       }
-      case 'download-backup': downloadBackup(); break;
-      case 'open-import': byId('restoreFile').value = ''; byId('restoreFile').click(); break;
       case 'copy-backup': copyBackup(); break;
-      case 'paste-clipboard': pasteFromClipboard(); break;
-      case 'paste-preview': pasteAndPreviewBackup(); break;
-      case 'restore-pasted': restorePastedBackup(); break;
+      case 'paste-backup': openPasteBackup(); break;
       case 'confirm-import': performImport(); break;
       case 'rename-course': renameCourse(target.dataset.course); renderAll(); break;
       case 'archive-course': toggleCourseArchive(target.dataset.course); renderAll(); break;
@@ -1711,6 +1655,13 @@
   }
 
   function handleSubmit(event) {
+    if (event.target.id === 'pasteBackupForm') {
+      event.preventDefault();
+      try { previewImport(parsePastedBackup(byId('restorePayload').value)); }
+      catch (error) { byId('pasteStatus').textContent = 'Backup not ready: ' + error.message; }
+      return;
+    }
+
     const form = event.target;
     if (!form.matches('form')) return;
     event.preventDefault();
@@ -1804,16 +1755,6 @@
     }
   }
 
-  async function handleRestoreFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      previewImport(JSON.parse(await file.text()));
-    } catch (error) {
-      window.alert(`Backup not restored: ${error.message || 'The file could not be read.'}`);
-    }
-  }
-
   function handleKeydown(event) {
     if (event.key === 'Escape' && byId('modalRoot').children.length) closeModal();
     const card = event.target.closest?.('[data-action="open-course"]');
@@ -1828,6 +1769,7 @@
     state = loadState();
     ensureSelections();
     save(migratedLegacyData ? 'Local data migrated safely' : 'Local-first dashboard ready');
+    window.teacherCommandCentreAssessments?.cleanEmptyStaleRows(state.courses.courses);
     window.addEventListener('teacher-command-centre-assessments-updated', () => {
       if (ui.view === 'reports') renderReports();
     });
@@ -1835,7 +1777,6 @@
     document.addEventListener('change', handleChange);
     document.addEventListener('submit', handleSubmit);
     document.addEventListener('keydown', handleKeydown);
-    byId('restoreFile').addEventListener('change', handleRestoreFile);
     renderAll();
   }
 

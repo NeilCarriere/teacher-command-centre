@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#102421">
   <meta name="description" content="A private, local-first teacher dashboard for planning, tracking, and reviewing classroom information.">
   <title>Neil's Teacher Command Centre</title>
-  <link rel="stylesheet" href="styles.css?v=27">
+  <link rel="stylesheet" href="styles.css?v=28">
 </head>
 <body>
   <div class="app-shell">
@@ -48,10 +48,7 @@
             <p class="panel-help">Record attendance and a fresh participation level for any school day — including yesterday — then open Attendance for the complete month view.</p>
             <div class="table-wrap"><table id="quickRoster" class="data-table"></table></div>
           </section>
-          <aside class="dashboard-side">
-            <section class="panel"><div class="panel-heading split-heading"><div><p class="panel-kicker">FOLLOW-UP</p><h2>Attendance Alerts</h2></div><button type="button" class="text-button" data-view="reports">View report →</button></div><div id="attendanceAlertSummary" class="threshold-grid"></div><p class="panel-help">At 5, 10, or 15 A+E entries: <strong>TEXT JAKE</strong>. At 20: refer to Student Success Team.</p></section>
-            <section class="panel"><div class="panel-heading split-heading"><div><p class="panel-kicker">ASSIGNMENTS</p><h2>Missing Work</h2></div><button type="button" class="text-button" data-view="assignments">Open tracker →</button></div><div id="missingSummary" class="compact-list"></div></section>
-          </aside>
+
         </div>
         <div id="commandStrip" class="command-strip dashboard-footer-cards"></div>
       </section>
@@ -66,15 +63,13 @@
 
       <section id="reportsView" class="view hidden"><section class="panel"><div class="panel-heading split-heading"><div><p class="panel-kicker">QUICK FACTUAL SNAPSHOT</p><h2>Reports</h2><p class="panel-help">See each student’s current running mark from entered evidence, plus a quick answer to: “What am I missing?”</p></div><label class="compact-field">Class <select id="reportCourse"></select></label></div><div id="reportMetrics" class="metric-grid"></div><div id="reportCards" class="report-cards"></div></section></section>
 
-      <section id="manageView" class="view hidden"><div class="manage-grid"><section class="panel"><p class="panel-kicker">ACTIVE ROSTERS ARE AUTHORITATIVE</p><h2>Manage Classes</h2><p class="panel-help">Archiving hides a class without deleting its historical records. Removing a student only removes them from the active roster.</p><form id="courseForm" class="inline-form"><label class="sr-only" for="courseName">New class name</label><input id="courseName" name="courseName" autocomplete="off" placeholder="e.g. Geography S2"><button type="submit" class="primary-button">Add Class</button></form><div id="courseList" class="manage-list"></div></section><section class="panel"><p class="panel-kicker">ADD OR CORRECT ACTIVE ROSTERS</p><h2>Manage Students</h2><div class="control-row slim-row"><label>Class <select id="manageCourse"></select></label></div><form id="studentForm" class="inline-form"><label class="sr-only" for="studentName">Student display name</label><input id="studentName" name="studentName" autocomplete="off" placeholder="Student display name"><button type="submit" class="primary-button">Add Student</button></form><div id="studentList" class="manage-list"></div></section></div></section>
+      <section id="manageView" class="view hidden"><div class="manage-grid"><section class="panel"><p class="panel-kicker">ACTIVE ROSTERS ARE AUTHORITATIVE</p><h2>Manage Classes</h2><p class="panel-help">Archiving hides a class without deleting its historical records. Removing a student clears their records for that class.</p><form id="courseForm" class="inline-form"><label class="sr-only" for="courseName">New class name</label><input id="courseName" name="courseName" autocomplete="off" placeholder="e.g. Geography S2"><button type="submit" class="primary-button">Add Class</button></form><div id="courseList" class="manage-list"></div></section><section class="panel"><p class="panel-kicker">ADD OR CORRECT ACTIVE ROSTERS</p><h2>Manage Students</h2><div class="control-row slim-row"><label>Class <select id="manageCourse"></select></label></div><form id="studentForm" class="inline-form"><label class="sr-only" for="studentName">Student display name</label><input id="studentName" name="studentName" autocomplete="off" placeholder="Student display name"><button type="submit" class="primary-button">Add Student</button></form><div id="studentList" class="manage-list"></div></section></div></section>
 
-      <section id="backupView" class="view hidden"><section class="panel backup-panel"><p class="panel-kicker">YOUR CURRENT WORK, PORTABLE</p><h2>Backup &amp; Restore</h2><p class="panel-help">Copy the complete dashboard to Winston in one click, or paste a backup from Winston and preview it before restoring.</p><div class="backup-actions"><button type="button" class="primary-button" data-action="download-backup">⬇ Download Backup File</button><button type="button" class="secondary-button" data-action="open-import">⬆ Restore Backup File</button><button type="button" class="secondary-button" data-action="copy-backup">📋 Copy Backup for Winston</button></div><p id="backupStatus" class="backup-status" aria-live="polite"></p><label for="backupPayload" class="backup-label">Current backup to send to Winston</label><textarea id="backupPayload" readonly spellcheck="false" aria-label="Current dashboard backup"></textarea><label for="restorePayload" class="backup-label">Paste a backup from Winston</label><textarea id="restorePayload" spellcheck="false" aria-label="Paste a dashboard backup from Winston" placeholder="Paste the complete backup text here…"></textarea><div class="backup-actions backup-restore-actions"><button type="button" class="secondary-button" data-action="paste-clipboard">📋 Paste from Clipboard</button><button type="button" class="secondary-button" data-action="paste-preview">📥 Paste &amp; Preview Backup</button><button type="button" class="primary-button" data-action="restore-pasted">↩ Restore Pasted Data</button></div><p class="privacy-note"><strong>Privacy:</strong> this data includes student information. Paste it only into the teacher-dashboard conversation you intend to use.</p></section></section>
+      <section id="backupView" class="view hidden"><section class="panel backup-panel"><p class="panel-kicker">YOUR CURRENT WORK, PORTABLE</p><h2>Backup &amp; Restore</h2><p class="panel-help">Save for Winston copies your complete backup. Paste it into your dashboard conversation. To restore, choose Paste Backup.</p><div class="backup-actions"><button type="button" class="primary-button" data-action="copy-backup">Save for Winston</button><button type="button" class="secondary-button" data-action="paste-backup">Paste Backup</button></div><p id="backupStatus" class="backup-status" aria-live="polite"></p><div id="backupCopyFallback" class="hidden"><label for="backupPayload" class="backup-label">Copy this complete backup</label><textarea id="backupPayload" readonly spellcheck="false" aria-label="Current dashboard backup"></textarea></div><p class="privacy-note">Your backup includes student information. Paste it into your teacher-dashboard conversation.</p></section></section>
     </main>
   </div>
-  <input id="restoreFile" type="file" accept="application/json,.json,text/plain" hidden>
   <div id="modalRoot" aria-live="polite"></div>
-  <script src="assessments.js?v=7" defer></script>
-  <script src="app.js?v=32" defer></script>
-  <script src="restore-fix.js?v=1" defer></script>
+  <script src="assessments.js?v=8" defer></script>
+  <script src="app.js?v=33" defer></script>
 </body>
 </html>

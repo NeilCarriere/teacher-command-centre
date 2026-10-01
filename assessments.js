@@ -98,6 +98,45 @@
   }
 
   window.teacherCommandCentreAssessments = {
+    cleanEmptyStaleRows: (allCourses) => {
+      let changed = false;
+      allCourses.forEach(course => {
+        (data.classes?.[course.name]?.assessments || []).forEach(assessment => {
+          Object.entries(assessment.students || {}).forEach(([name, row]) => {
+            // An absent name with evidence may be a rename: retain it for recovery.
+            const empty = row && Object.entries(row).every(([key, value]) =>
+              ['completed', 'mark', 'note', 'notRequired'].includes(key) &&
+              (value === '' || value === false || value == null));
+            if (!course.students.includes(name) && empty) {
+              delete assessment.students[name];
+              changed = true;
+            }
+          });
+        });
+      });
+      if (changed) save('Empty obsolete test entries cleared');
+    },
+    renameCourse: (oldName, next) => {
+      if (!data.classes?.[oldName]) return;
+      data.classes[next] = data.classes[oldName];
+      delete data.classes[oldName];
+      if (courseName === oldName) courseName = next;
+      save();
+    },
+    renameStudent: (name, oldName, next) => {
+      (data.classes?.[name]?.assessments || []).forEach(assessment => {
+        if (!assessment.students?.[oldName]) return;
+        assessment.students[next] = assessment.students[oldName];
+        delete assessment.students[oldName];
+      });
+      save();
+    },
+    removeStudent: (name, student) => {
+      (data.classes?.[name]?.assessments || []).forEach(assessment => {
+        if (assessment.students) delete assessment.students[student];
+      });
+      save();
+    },
     exportData: () => cloneData(data),
     importData: (incoming) => {
       data = incoming && typeof incoming === 'object' ? cloneData(incoming) : { classes: {} };
