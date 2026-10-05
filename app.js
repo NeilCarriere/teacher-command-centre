@@ -565,9 +565,10 @@
       const status = assessment?.archived ? 'Archived · ' : '';
       return {
         category: 'classroom',
+        weight: type.toLowerCase() === 'quiz' ? 1 : 2,
         name: text(assessment?.name) || 'Untitled test / quiz',
         percentage,
-        detail: status + type + ` · ${mark}/${maximum}` + date
+        detail: status + type + ` · ${mark}/${maximum} · ${type.toLowerCase() === 'quiz' ? '1×' : '2×'} weight` + date
       };
     }).filter(Boolean);
   }
@@ -602,7 +603,8 @@
   }
 
   function averageEvidence(evidence) {
-    return evidence.length ? evidence.reduce((total, item) => total + item.percentage, 0) / evidence.length : null;
+    const totalWeight = evidence.reduce((total, item) => total + (item.weight || 1), 0);
+    return totalWeight ? evidence.reduce((total, item) => total + item.percentage * (item.weight || 1), 0) / totalWeight : null;
   }
 
   function runningMarkForEvidence(evidence) {
@@ -619,7 +621,7 @@
     const calculation = classroom !== null && participation !== null
       ? ' Running mark = (Classroom work × 65 + Participation × 15) ÷ 80.'
       : ' Only the assessed component counts until both have evidence.';
-    return summary + calculation + ' The 20% final is not included yet. Unexcused absences count as 0% participation for that day; excused days are excluded. Blank days, N/A and Incomplete are not zeroes.';
+    return summary + calculation + ' Tests count twice as much as assignments; quizzes count once. The 20% final is not included yet. Unexcused absences count as 0% participation for that day; excused days are excluded. Blank days, N/A and Incomplete are not zeroes.';
   }
 
   function ensureSelections() {
