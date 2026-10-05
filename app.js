@@ -901,6 +901,12 @@
     return courses.map((course) => `<option value="${escapeAttr(course.name)}" ${course.name === selected ? 'selected' : ''}>${escapeHtml(course.name)}${course.archived ? ' (archived)' : ''}</option>`).join('');
   }
 
+  function shiftAttendanceMonth(value, offset) {
+    const [year, month] = value.split('-').map(Number);
+    const date = new Date(year, month - 1 + offset, 1, 12);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
   function daysInMonth(value) {
     const [year, month] = value.split('-').map(Number);
     return new Date(year, month, 0).getDate();
@@ -916,6 +922,7 @@
     byId('attendanceCourse').innerHTML = courseOptions(courseName);
     byId('attendanceDate').value = ui.selectedDate;
     byId('attendanceMonth').value = ui.selectedMonth;
+    byId('attendanceMonthTitle').textContent = `Month at a Glance — ${formatDate(`${ui.selectedMonth}-01`, { month: 'long', year: 'numeric' })}`;
     const note = schoolDayMessage(ui.selectedDate);
     byId('attendanceSchoolDayNote').classList.toggle('hidden', !note);
     byId('attendanceSchoolDayNote').textContent = note;
@@ -1555,6 +1562,9 @@
         break;
       }
       case 'set-participation': setParticipation(target.dataset.course, target.dataset.student, target.dataset.date, Number(target.dataset.level)); renderAll(); break;
+      case 'attendance-previous-month': ui.selectedMonth = shiftAttendanceMonth(ui.selectedMonth, -1); renderAll(); break;
+      case 'attendance-next-month': ui.selectedMonth = shiftAttendanceMonth(ui.selectedMonth, 1); renderAll(); break;
+      case 'attendance-current-month': ui.selectedMonth = monthISO(); renderAll(); break;
       case 'attendance-today': ui.selectedDate = todayISO(); ui.selectedMonth = monthISO(); renderAll(); break;
       case 'open-attendance-picker': showAttendancePicker(target.dataset.course, target.dataset.student, target.dataset.date); break;
       case 'picker-set-status': {
