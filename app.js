@@ -577,29 +577,33 @@
     return [
       ...assignmentEvidenceForStudent(courseName, studentName),
       ...testQuizEvidenceForStudent(courseName, studentName, assessmentData),
-      ...participationEvidenceForStudent(ensureRecord(courseName, studentName))
+      ...participationEvidenceForStudent(ensureRecord(courseName, studentName)),
+      ...attendanceEvidenceForStudent(ensureRecord(courseName, studentName))
     ];
   }
 
   function participationEvidenceForStudent(record) {
     const attendance = new Map(normalizeAttendance(record.attendance).map(entry => [entry.date, entry.status]));
     const history = normalizeParticipationHistory(record.participationHistory);
-    // Preserve recorded levels; attendance changes only the calculated evidence.
     const entries = history.length ? history : (record.participation ? [{ level: record.participation }] : []);
-    const evidence = entries.filter(entry => !['A', 'E'].includes(attendance.get(entry.date))).map(entry => ({
+    return entries.filter(entry => !['A', 'E'].includes(attendance.get(entry.date))).map(entry => ({
       name: entry.date ? `Participation · ${formatShortDate(entry.date)}` : 'Prior participation',
-      detail: `Attendance/Participation · Level ${entry.level}`,
+      detail: `Participation · Level ${entry.level}`,
       category: 'participation',
       percentage: percentageFromAchievement(String(entry.level))
     })).filter(entry => entry.percentage !== null);
-    attendance.forEach((status, date) => {
-      if (status === 'A') evidence.push({
-        name: `Unexcused absence · ${formatShortDate(date)}`,
-        detail: 'Attendance/Participation · Unexcused absence · 0%',
-        category: 'participation', percentage: 0
-      });
-    });
-    return evidence;
+  }
+
+  function attendanceEvidenceForStudent(record) {
+    const entries = normalizeAttendance(record.attendance);
+    if (!entries.length) return [];
+    const credited = entries.filter(entry => entry.status !== 'A').length;
+    return [{
+      name: 'Recorded school-day attendance',
+      detail: `Attendance · ${credited}/${entries.length} recorded days`,
+      category: 'attendance',
+      percentage: (credited / entries.length) * 100
+    }];
   }
 
   function averageEvidence(evidence) {
@@ -608,20 +612,18 @@
   }
 
   function runningMarkForEvidence(evidence) {
-    const classroom = averageEvidence(evidence.filter((item) => item.category === 'classroom'));
-    const participation = averageEvidence(evidence.filter((item) => item.category === 'participation'));
-    const weight = (classroom === null ? 0 : 65) + (participation === null ? 0 : 15);
-    return weight ? ((classroom ?? 0) * 65 + (participation ?? 0) * 15) / weight : null;
+    const classroom = averageEvidence(evidence.filter(item => item.category === 'classroom'));
+    const participation = averageEvidence(evidence.filter(item => item.category === 'participation'));
+    const attendance = averageEvidence(evidence.filter(item => item.category === 'attendance'));
+    const weight = (classroom === null ? 0 : 65) + (participation === null ? 0 : 10) + (attendance === null ? 0 : 5);
+    return weight ? ((classroom ?? 0) * 65 + (participation ?? 0) * 10 + (attendance ?? 0) * 5) / weight : null;
   }
 
   function runningMarkExplanation(evidence) {
-    const classroom = averageEvidence(evidence.filter((item) => item.category === 'classroom'));
-    const participation = averageEvidence(evidence.filter((item) => item.category === 'participation'));
-    const summary = `Classroom work (65%): ${formatPercentage(classroom)} · Attendance/Participation (15%): ${formatPercentage(participation)}.`;
-    const calculation = classroom !== null && participation !== null
-      ? ' Running mark = (Classroom work × 65 + Participation × 15) ÷ 80.'
-      : ' Only the assessed component counts until both have evidence.';
-    return summary + calculation + ' Tests count twice as much as assignments; quizzes count once. The 20% final is not included yet. Unexcused absences count as 0% participation for that day; excused days are excluded. Blank days, N/A and Incomplete are not zeroes.';
+    const classroom = averageEvidence(evidence.filter(item => item.category === 'classroom'));
+    const participation = averageEvidence(evidence.filter(item => item.category === 'participation'));
+    const attendance = averageEvidence(evidence.filter(item => item.category === 'attendance'));
+    return `Classroom work (65%): ${formatPercentage(classroom)} · Participation (10%): ${formatPercentage(participation)} · Attendance (5%): ${formatPercentage(attendance)}. Running mark uses available components normalized to their combined weight. Tests count twice as much as assignments; quizzes count once. The 20% final is not included yet. Unexcused absences reduce attendance only; excused days receive attendance credit. Blank days, N/A and Incomplete are not zeroes.`;
   }
 
   function ensureSelections() {
