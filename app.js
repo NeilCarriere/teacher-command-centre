@@ -1047,7 +1047,7 @@
     const reportAssignments = [...activeAssignments, ...handedBackAssignments];
     const assessmentData = window.teacherCommandCentreAssessments?.exportData?.() || { classes: {} };
     const finalExam = asArray(assessmentData.classes?.[courseName]?.assessments).find(item => item.type === 'Final Exam');
-    const examWeight = Math.max(0, Math.min(85, Number(finalExam?.finalWeight ?? 20)));
+    const examWeight = Math.max(0, Math.min(20, Number(finalExam?.finalWeight ?? 20)));
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
