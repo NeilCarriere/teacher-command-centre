@@ -74,7 +74,7 @@
     const active = assessments.filter(a => !a.archived);
     const upcoming = active.filter(a => validDate(a.date) && a.date >= today()).length;
     byId('assessmentSummary').innerHTML = `<div class="summary-card"><strong>${active.length}</strong><span>Active tests / quizzes</span></div><div class="summary-card"><strong>${upcoming}</strong><span>Upcoming</span></div><div class="summary-card"><strong>${roster(courseName).length}</strong><span>Students</span></div>`;
-    byId('assessmentList').innerHTML = assessments.length ? assessments.map(a => `<div class="assessment-list-item ${a.id===selectedId?'active':''} ${a.archived?'archived':''}"><button type="button" class="assessment-select" data-assessment-id="${attr(a.id)}" aria-label="Open ${attr(a.name)}"><strong>${esc(a.name)}</strong><span>${esc(a.type || 'Test')} · ${fmt(a.date)} · /${Number(a.maxMark)||100}</span></button><button type="button" class="secondary-button assessment-edit-button" data-assessment-edit-id="${attr(a.id)}" aria-label="Edit ${attr(a.name)}">Edit</button></div>`).join('') : `<div class="empty-state"><h3>No tests or quizzes yet</h3><p>Add one when you are ready.</p></div>`;
+    byId('assessmentList').innerHTML = assessments.length ? assessments.map(a => `<div class="assessment-list-item ${a.id===selectedId?'active':''} ${a.archived?'archived':''}"><button type="button" class="assessment-select" data-assessment-id="${attr(a.id)}" aria-label="Open ${attr(a.name)}"><strong>${esc(a.name)}</strong><span>${esc(a.type || 'Test')} · ${fmt(a.date)} · /${Number(a.maxMark)||100}${a.type==='Final Exam'?` · ${a.finalWeight ?? 20}% of final mark`:''}</span></button><button type="button" class="secondary-button assessment-edit-button" data-assessment-edit-id="${attr(a.id)}" aria-label="Edit ${attr(a.name)}">Edit</button></div>`).join('') : `<div class="empty-state"><h3>No tests or quizzes yet</h3><p>Add one when you are ready.</p></div>`;
     renderDetail();
   }
 
@@ -85,12 +85,13 @@
     if (!a) { box.innerHTML=''; return; }
     normalize(a);
     const students = roster(courseName);
-    box.innerHTML = `<div class="panel-heading split-heading"><div><p class="panel-kicker">${esc(a.type || 'TEST')}</p><h3>${esc(a.name)}</h3><p class="panel-help">Date: ${fmt(a.date)} · Maximum: ${Number(a.maxMark)||100}</p></div><div><button type="button" class="secondary-button" data-action="edit-assessment">Edit</button> <button type="button" class="secondary-button" data-action="archive-assessment">${a.archived?'Restore':'Archive'}</button></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Completed</th><th>Mark</th><th>Note</th></tr></thead><tbody>${students.map(student => { const r=a.students[student]||{}; return `<tr><td><strong>${esc(student)}</strong></td><td><input type="checkbox" data-assessment-student="${attr(student)}" data-field="completed" ${r.completed?'checked':''}></td><td><input type="number" min="0" max="${Number(a.maxMark)||100}" step="0.5" value="${attr(r.mark)}" data-assessment-student="${attr(student)}" data-field="mark" style="max-width:7rem"></td><td><input value="${attr(r.note)}" data-assessment-student="${attr(student)}" data-field="note" placeholder="Optional note"></td></tr>`; }).join('')}</tbody></table></div>`;
+    box.innerHTML = `<div class="panel-heading split-heading"><div><p class="panel-kicker">${esc(a.type || 'TEST')}</p><h3>${esc(a.name)}</h3><p class="panel-help">Date: ${fmt(a.date)} · Maximum: ${Number(a.maxMark)||100}${a.type==='Final Exam'?` · ${a.finalWeight ?? 20}% of final mark`:''}</p></div><div><button type="button" class="secondary-button" data-action="edit-assessment">Edit</button> <button type="button" class="secondary-button" data-action="archive-assessment">${a.archived?'Restore':'Archive'}</button></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Completed</th><th>Mark</th><th>Note</th></tr></thead><tbody>${students.map(student => { const r=a.students[student]||{}; return `<tr><td><strong>${esc(student)}</strong></td><td><input type="checkbox" data-assessment-student="${attr(student)}" data-field="completed" ${r.completed?'checked':''}></td><td><input type="number" min="0" max="${Number(a.maxMark)||100}" step="0.5" value="${attr(r.mark)}" data-assessment-student="${attr(student)}" data-field="mark" style="max-width:7rem"></td><td><input value="${attr(r.note)}" data-assessment-student="${attr(student)}" data-field="note" placeholder="Optional note"></td></tr>`; }).join('')}</tbody></table></div>`;
   }
 
-  function addForm(a=null) {
+  function addForm(a=null, finalExam=false) {
     const editing = Boolean(a);
-    showModal(`<h2>${editing?'Edit':'Add'} Test / Quiz</h2><form id="assessmentForm" class="modal-form"><label>Class<select name="course">${courses().map(c=>`<option ${c.name===courseName?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Name<input name="name" required value="${attr(a?.name||'')}" placeholder="e.g. Municipal Elections Quiz"></label><div class="modal-row"><label>Type<select name="type"><option ${a?.type==='Test'?'selected':''}>Test</option><option ${a?.type==='Quiz'?'selected':''}>Quiz</option></select></label><label>Date<span class="date-control"><input type="date" name="date" required value="${attr(a?.date||today())}" aria-label="Test or quiz date"><button type="button" class="date-picker-button" data-action="open-date-picker" data-date-input="date" aria-label="Open test or quiz calendar">📅 <span>Choose</span></button></span></label></div><label>Maximum mark<input type="number" name="maxMark" min="1" value="${Number(a?.maxMark)||100}" required></label>${editing?`<input type="hidden" name="id" value="${attr(a.id)}">`:''}<div class="modal-actions"><button type="button" class="secondary-button" data-assessment-close>Cancel</button><button type="submit" class="primary-button">${editing?'Save Changes':'Add Test / Quiz'}</button></div></form>`);
+    const isFinal = a?.type === 'Final Exam' || finalExam;
+    showModal(`<h2>${editing?'Edit':'Add'} Test / Quiz / Final Exam</h2><form id="assessmentForm" class="modal-form"><label>Class<select name="course">${courses().map(c=>`<option ${c.name===courseName?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Name<input name="name" required value="${attr(a?.name||'')}" placeholder="e.g. Municipal Elections Quiz"></label><div class="modal-row"><label>Type<select name="type"><option ${a?.type==='Test'?'selected':''}>Test</option><option ${a?.type==='Quiz'?'selected':''}>Quiz</option><option ${isFinal?'selected':''}>Final Exam</option></select></label><label>Date<span class="date-control"><input type="date" name="date" required value="${attr(a?.date||today())}" aria-label="Test or quiz date"><button type="button" class="date-picker-button" data-action="open-date-picker" data-date-input="date" aria-label="Open test or quiz calendar">📅 <span>Choose</span></button></span></label></div><label>Maximum mark<input type="number" name="maxMark" min="1" value="${Number(a?.maxMark)||100}" required></label><label id="examWeightField" class="${isFinal?'':'hidden'}">Final exam weight (% of course mark)<input type="number" name="finalWeight" min="0" max="85" step="0.1" value="${a?.finalWeight ?? 20}" ${isFinal?'required':'disabled'}><span class="panel-help">Attendance stays 5% and participation 10%. Classroom work uses the remaining percentage. An unmarked exam stays pending.</span></label>${editing?`<input type="hidden" name="id" value="${attr(a.id)}">`:''}<div class="modal-actions"><button type="button" class="secondary-button" data-assessment-close>Cancel</button><button type="submit" class="primary-button">${editing?'Save Changes':'Add Assessment'}</button></div></form>`);
   }
 
   function cloneData(value) {
@@ -161,6 +162,7 @@
     if (course) { courseName=course.dataset.assessmentCourse; selectedId=''; render(); return; }
     const item = e.target.closest('[data-assessment-id]');
     if (item) { selectedId=item.dataset.assessmentId; render(); return; }
+    if (e.target.closest('[data-action="show-add-final-exam"]')) { addForm(null, true); return; }
     if (e.target.closest('[data-action="show-add-assessment"]')) { addForm(); return; }
     if (e.target.closest('[data-action="edit-assessment"]')) { addForm(current()); return; }
     if (e.target.closest('[data-action="archive-assessment"]')) { const a=current(); if(a){a.archived=!a.archived; save(a.archived?'Test / quiz archived':'Test / quiz restored'); render();} return; }
@@ -170,12 +172,23 @@
   });
 
   document.addEventListener('change', (e) => {
+    if (e.target.matches('#assessmentForm select[name="type"]')) {
+      const isFinal = e.target.value === 'Final Exam';
+      const field = byId('examWeightField');
+      field.classList.toggle('hidden', !isFinal);
+      const weightInput = field.querySelector('input');
+      weightInput.disabled = !isFinal; weightInput.required = isFinal;
+      return;
+    }
     const input=e.target.closest('[data-assessment-student]');
     if(!input) return;
     const a=current(); if(!a) return;
     normalize(a);
     const student=input.dataset.assessmentStudent;
     const field=input.dataset.field;
+    if (a.type === 'Final Exam' && field === 'mark' && input.value !== '' && (!Number.isFinite(Number(input.value)) || Number(input.value) < 0 || Number(input.value) > Number(a.maxMark))) {
+      window.alert('Enter a mark between 0 and the maximum mark.'); renderDetail(); return;
+    }
     a.students[student][field] = field==='completed' ? input.checked : input.value;
     if(field==='mark' && input.value !== '') a.students[student].completed=true;
     save('Test / quiz result saved');
@@ -187,8 +200,21 @@
     e.preventDefault(); e.stopImmediatePropagation();
     const f=new FormData(e.target); const targetCourse=String(f.get('course')||''); const id=String(f.get('id')||'');
     let a=id ? bucket(courseName).find(x=>x.id===id) : null;
+    const type = String(f.get('type') || 'Test');
+    const maxMark = Number(f.get('maxMark'));
+    const finalWeight = Number(f.get('finalWeight'));
+    if (!Number.isFinite(maxMark) || maxMark <= 0 || (type === 'Final Exam' && (!Number.isFinite(finalWeight) || finalWeight < 0 || finalWeight > 85))) {
+      window.alert('Enter a positive maximum mark and a final exam weight from 0 to 85%.'); return;
+    }
+    if (type === 'Final Exam' && bucket(targetCourse).some(x => x.id !== id && x.type === 'Final Exam')) {
+      window.alert('This class already has a final exam. Edit that exam to change its marks or weight.'); return;
+    }
+    if (type === 'Final Exam' && a && Object.values(a.students || {}).some(row => row.mark !== '' && row.mark != null && Number(row.mark) > maxMark)) {
+      window.alert('The maximum cannot be lower than an existing student mark. Correct those marks first.'); return;
+    }
     if(!a){ a={id:uid(),students:{},archived:false}; bucket(targetCourse).push(a); }
     a.name=String(f.get('name')||'').trim(); a.type=String(f.get('type')||'Test'); a.date=String(f.get('date')||today()); a.maxMark=Math.max(1,Number(f.get('maxMark'))||100);
+    if (type === 'Final Exam') a.finalWeight = finalWeight; else delete a.finalWeight;
     if(targetCourse!==courseName && id){ bucket(courseName).splice(bucket(courseName).indexOf(a),1); bucket(targetCourse).push(a); }
     courseName=targetCourse; selectedId=a.id; normalize(a); save('Test / quiz saved'); closeModal(); render();
   }, true);
@@ -196,3 +222,4 @@
   const observer = new MutationObserver(() => { if(!byId('assessmentsView')?.classList.contains('hidden')) render(); });
   window.addEventListener('DOMContentLoaded', () => { const v=byId('assessmentsView'); if(v) observer.observe(v,{attributes:true,attributeFilter:['class']}); });
 })();
+

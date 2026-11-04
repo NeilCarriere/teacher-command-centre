@@ -564,11 +564,11 @@
       const date = validDate(assessment?.date) ? ` · ${formatShortDate(assessment.date)}` : '';
       const status = assessment?.archived ? 'Archived · ' : '';
       return {
-        category: 'classroom',
+        category: type === 'Final Exam' ? 'final' : 'classroom',
         weight: type.toLowerCase() === 'quiz' ? 1 : 2,
         name: text(assessment?.name) || 'Untitled test / quiz',
         percentage,
-        detail: status + type + ` · ${mark}/${maximum} · ${type.toLowerCase() === 'quiz' ? '1×' : '2×'} weight` + date
+        detail: status + type + ` · ${mark}/${maximum} · ${type === 'Final Exam' ? `${assessment.finalWeight ?? 20}% of final mark` : `${type.toLowerCase() === 'quiz' ? '1×' : '2×'} weight`}` + date
       };
     }).filter(Boolean);
   }
@@ -611,34 +611,29 @@
     return totalWeight ? evidence.reduce((total, item) => total + item.percentage * (item.weight || 1), 0) / totalWeight : null;
   }
 
-  function runningMarkForEvidence(evidence) {
-    const classroom = averageEvidence(evidence.filter(item => item.category === 'classroom'));
-    const participation = averageEvidence(evidence.filter(item => item.category === 'participation'));
-    const attendance = averageEvidence(evidence.filter(item => item.category === 'attendance'));
-    const weight = (classroom === null ? 0 : 65) + (participation === null ? 0 : 10) + (attendance === null ? 0 : 5);
-    return weight ? ((classroom ?? 0) * 65 + (participation ?? 0) * 10 + (attendance ?? 0) * 5) / weight : null;
+  function markComponents(evidence, examWeight = 20) {
+    return [
+      { label: 'Classroom work', weight: 85 - examWeight, category: 'classroom' },
+      { label: 'Participation', weight: 10, category: 'participation' },
+      { label: 'Attendance', weight: 5, category: 'attendance' },
+      { label: 'Final exam', weight: examWeight, category: 'final' }
+    ].map(component => ({ ...component, value: averageEvidence(evidence.filter(item => item.category === component.category)) }));
   }
 
-  function runningMarkBreakdownMarkup(evidence) {
-    const components = [
-      { label: 'Classroom work', weight: '65%', category: 'classroom' },
-      { label: 'Participation', weight: '10%', category: 'participation' },
-      { label: 'Attendance', weight: '5%', category: 'attendance' }
-    ];
-    const cards = components.map(component => {
-      const value = averageEvidence(evidence.filter(item => item.category === component.category));
-      return '<div class="running-mark-component"><span>' + component.label + '</span><strong>' + formatPercentage(value) + '</strong><small>' + component.weight + ' weight</small></div>';
-    }).join('');
-    return '<div class="running-mark-breakdown" aria-label="Running mark components">' + cards +
-      '<div class="running-mark-component running-mark-final"><span>Final evaluation</span><strong>Pending</strong><small>20% weight</small></div></div>' +
-      '<p class="running-mark-note">Running mark uses available components only. Tests count 2×; quizzes 1×. Unexcused absences affect attendance only. Excused days receive attendance credit.</p>';
+  function runningMarkForEvidence(evidence, examWeight = 20) {
+    const components = markComponents(evidence, examWeight).filter(item => item.value !== null && item.weight > 0);
+    const weight = components.reduce((sum, item) => sum + item.weight, 0);
+    return weight ? components.reduce((sum, item) => sum + item.value * item.weight, 0) / weight : null;
   }
 
-  function runningMarkExplanation(evidence) {
-    const classroom = averageEvidence(evidence.filter(item => item.category === 'classroom'));
-    const participation = averageEvidence(evidence.filter(item => item.category === 'participation'));
-    const attendance = averageEvidence(evidence.filter(item => item.category === 'attendance'));
-    return `Classroom work (65%): ${formatPercentage(classroom)} · Participation (10%): ${formatPercentage(participation)} · Attendance (5%): ${formatPercentage(attendance)}. Running mark uses available components normalized to their combined weight. Tests count twice as much as assignments; quizzes count once. The 20% final is not included yet. Unexcused absences reduce attendance only; excused days receive attendance credit. Blank days, N/A and Incomplete are not zeroes.`;
+  function runningMarkBreakdownMarkup(evidence, examWeight = 20) {
+    const cards = markComponents(evidence, examWeight).map(component =>
+      '<div class="running-mark-component"><span>' + component.label + '</span><strong>' +
+      (component.category === 'final' && component.value === null ? 'Pending' : formatPercentage(component.value)) +
+      '</strong><small>' + component.weight + '% weight</small></div>'
+    ).join('');
+    return '<div class="running-mark-breakdown" aria-label="Running mark components">' + cards + '</div>' +
+      '<p class="running-mark-note">Running mark uses available components only; an unmarked final exam is pending, not zero. Tests count 2×; quizzes 1×. Final exams count separately at their selected percentage. Unexcused absences affect attendance only. Excused days receive attendance credit.</p>';
   }
 
   function ensureSelections() {
@@ -1051,6 +1046,8 @@
     const handedBackAssignments = assignmentsFor(courseName).filter((assignment) => assignment.markedHandedBack);
     const reportAssignments = [...activeAssignments, ...handedBackAssignments];
     const assessmentData = window.teacherCommandCentreAssessments?.exportData?.() || { classes: {} };
+    const finalExam = asArray(assessmentData.classes?.[courseName]?.assessments).find(item => item.type === 'Final Exam');
+    const examWeight = Math.max(0, Math.min(85, Number(finalExam?.finalWeight ?? 20)));
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
@@ -1067,7 +1064,7 @@
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
         const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
         const evidence = reportEvidenceForStudent(courseName, student, assessmentData);
-        const runningMark = runningMarkForEvidence(evidence);
+        const runningMark = runningMarkForEvidence(evidence, examWeight);
         const evidenceLabel = evidence.length === 1 ? 'evidence item' : 'evidence items';
         return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'Not assessed yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
       }).join('') : '<p class="empty-copy">No students are on this active roster.</p>';
@@ -1082,7 +1079,7 @@
     const record = ensureRecord(courseName, selectedStudent);
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
     const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData);
-    const runningMark = runningMarkForEvidence(evidence);
+    const runningMark = runningMarkForEvidence(evidence, examWeight);
     const evidenceRows = evidence.map((item) => '<li class="report-assignment report-evidence"><span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.detail) + '</small></span><span class="chip success">' + formatPercentage(item.percentage) + '</span></li>');
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
     const assignmentRows = reportAssignments.map((assignment) => {
@@ -1102,7 +1099,7 @@
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div>' + runningMarkBreakdownMarkup(evidence) + '</div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Entered marks and participation evidence use the agreed level scale. Pass is Level 4 (85%) in participation only. R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div>' + runningMarkBreakdownMarkup(evidence, examWeight) + '</div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Entered marks and participation evidence use the agreed level scale. Pass is Level 4 (85%) in participation only. R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
     
   }
 
@@ -1812,3 +1809,4 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 })();
+
