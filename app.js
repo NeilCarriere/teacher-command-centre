@@ -573,12 +573,12 @@
     }).filter(Boolean);
   }
 
-  function reportEvidenceForStudent(courseName, studentName, assessmentData) {
+  function reportEvidenceForStudent(courseName, studentName, assessmentData, recordedDays) {
     return [
       ...assignmentEvidenceForStudent(courseName, studentName),
       ...testQuizEvidenceForStudent(courseName, studentName, assessmentData),
       ...participationEvidenceForStudent(ensureRecord(courseName, studentName)),
-      ...attendanceEvidenceForStudent(ensureRecord(courseName, studentName))
+      ...attendanceEvidenceForStudent(ensureRecord(courseName, studentName), recordedDays)
     ];
   }
 
@@ -594,15 +594,27 @@
     })).filter(entry => entry.percentage !== null);
   }
 
-  function attendanceEvidenceForStudent(record) {
-    const entries = normalizeAttendance(record.attendance);
-    if (!entries.length) return [];
-    const credited = entries.filter(entry => entry.status !== 'A').length;
+  function recordedAttendanceDays(course) {
+    const dates = new Set();
+    for (const student of course.students) {
+      for (const entry of ensureRecord(course.name, student).attendance) {
+        if (!dates.has(entry.date) && isSchoolDay(entry.date)) dates.add(entry.date);
+      }
+    }
+    return dates;
+  }
+
+  function attendanceEvidenceForStudent(record, recordedDays) {
+    if (!recordedDays.size) return [];
+    const unexcused = record.attendance.filter(entry =>
+      entry.status === 'A' && recordedDays.has(entry.date)
+    ).length;
+    const credited = recordedDays.size - unexcused;
     return [{
       name: 'Recorded school-day attendance',
-      detail: `Attendance · ${credited}/${entries.length} recorded days`,
+      detail: `Attendance · ${credited}/${recordedDays.size} recorded class days · ${unexcused} unexcused`,
       category: 'attendance',
-      percentage: (credited / entries.length) * 100
+      percentage: (credited / recordedDays.size) * 100
     }];
   }
 
@@ -1048,6 +1060,7 @@
     const assessmentData = window.teacherCommandCentreAssessments?.exportData?.() || { classes: {} };
     const finalExam = asArray(assessmentData.classes?.[courseName]?.assessments).find(item => item.type === 'Final Exam');
     const examWeight = Math.max(0, Math.min(20, Number(finalExam?.finalWeight ?? 20)));
+    const recordedDays = recordedAttendanceDays(course);
     const attendanceTotal = course.students.reduce((total, student) => total + countAbsences(ensureRecord(courseName, student)), 0);
     const missingTotal = allMissingItems(courseName).length;
     const notesTotal = course.students.reduce((total, student) => total + ensureRecord(courseName, student).notes.length, 0);
@@ -1063,7 +1076,7 @@
           return !row.submitted && !row.notRequired;
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
         const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
-        const evidence = reportEvidenceForStudent(courseName, student, assessmentData);
+        const evidence = reportEvidenceForStudent(courseName, student, assessmentData, recordedDays);
         const runningMark = runningMarkForEvidence(evidence, examWeight);
         const evidenceLabel = evidence.length === 1 ? 'evidence item' : 'evidence items';
         return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'Not assessed yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
@@ -1078,7 +1091,7 @@
 
     const record = ensureRecord(courseName, selectedStudent);
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
-    const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData);
+    const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData, recordedDays);
     const runningMark = runningMarkForEvidence(evidence, examWeight);
     const evidenceRows = evidence.map((item) => '<li class="report-assignment report-evidence"><span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.detail) + '</small></span><span class="chip success">' + formatPercentage(item.percentage) + '</span></li>');
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
