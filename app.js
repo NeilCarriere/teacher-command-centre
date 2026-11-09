@@ -311,6 +311,8 @@
     return {
       name: text(source.name),
       archived: Boolean(source.archived),
+      startDate: validDate(source.startDate) ? source.startDate : '',
+      transition: text(source.transition),
       students: sortRoster(uniqueStrings(source.students))
     };
   }
@@ -564,7 +566,7 @@
       const date = validDate(assessment?.date) ? ` · ${formatShortDate(assessment.date)}` : '';
       const status = assessment?.archived ? 'Archived · ' : '';
       return {
-        category: type === 'Final Exam' ? 'final' : 'classroom',
+        category: type === 'Final Exam' ? 'final' : courseName === 'Careers' && type === 'Culminating Activity' ? 'culminating' : courseName === 'Careers' && type === 'Financial Literacy Exam' ? 'financial' : 'classroom',
         weight: type.toLowerCase() === 'quiz' ? 1 : 2,
         name: text(assessment?.name) || 'Untitled test / quiz',
         percentage,
@@ -623,23 +625,31 @@
     return totalWeight ? evidence.reduce((total, item) => total + item.percentage * (item.weight || 1), 0) / totalWeight : null;
   }
 
-  function markComponents(evidence, examWeight = 20) {
-    return [
+  function markComponents(evidence, examWeight = 20, courseName = '') {
+    const components = courseName === 'Careers' ? [
+      { label: 'Classroom work', weight: 65, category: 'classroom' },
+      { label: 'Participation', weight: 10, category: 'participation' },
+      { label: 'Attendance', weight: 5, category: 'attendance' },
+      { label: 'Final exam', weight: 10, category: 'final' },
+      { label: 'Culminating activity', weight: 5, category: 'culminating' },
+      { label: 'Financial literacy exam', weight: 5, category: 'financial' }
+    ] : [
       { label: 'Classroom work', weight: 85 - examWeight, category: 'classroom' },
       { label: 'Participation', weight: 10, category: 'participation' },
       { label: 'Attendance', weight: 5, category: 'attendance' },
       { label: 'Final exam', weight: examWeight, category: 'final' }
-    ].map(component => ({ ...component, value: averageEvidence(evidence.filter(item => item.category === component.category)) }));
+    ];
+    return components.map(component => ({ ...component, value: averageEvidence(evidence.filter(item => item.category === component.category)) }));
   }
 
-  function runningMarkForEvidence(evidence, examWeight = 20) {
-    const components = markComponents(evidence, examWeight).filter(item => item.value !== null && item.weight > 0);
+  function runningMarkForEvidence(evidence, examWeight = 20, courseName = '') {
+    const components = markComponents(evidence, examWeight, courseName).filter(item => item.value !== null && item.weight > 0);
     const weight = components.reduce((sum, item) => sum + item.weight, 0);
     return weight ? components.reduce((sum, item) => sum + item.value * item.weight, 0) / weight : null;
   }
 
-  function runningMarkBreakdownMarkup(evidence, examWeight = 20) {
-    const cards = markComponents(evidence, examWeight).map(component =>
+  function runningMarkBreakdownMarkup(evidence, examWeight = 20, courseName = '') {
+    const cards = markComponents(evidence, examWeight, courseName).map(component =>
       '<div class="running-mark-component"><span>' + component.label + '</span><strong>' +
       (component.category === 'final' && component.value === null ? 'Pending' : formatPercentage(component.value)) +
       '</strong><small>' + component.weight + '% weight</small></div>'
@@ -653,10 +663,11 @@
     const available = courses.map((course) => course.name);
     if (!available.includes(state.currentClass)) state.currentClass = available[0] || '';
     state.studentData.currentClass = state.currentClass;
-    ['attendanceCourse', 'assignmentCourse', 'notesCourse', 'reportCourse', 'manageCourse'].forEach((key) => {
+    ['attendanceCourse', 'assignmentCourse', 'notesCourse', 'manageCourse'].forEach((key) => {
       if (!available.includes(ui[key])) ui[key] = state.currentClass;
     });
     if (!activeStudents(ui.notesCourse).includes(ui.notesStudent)) ui.notesStudent = activeStudents(ui.notesCourse)[0] || '';
+    if (!findCourse(ui.reportCourse)) ui.reportCourse = state.currentClass;
     const reportRoster = activeStudents(ui.reportCourse);
     if (!reportRoster.includes(ui.reportStudent)) ui.reportStudent = reportRoster[0] || '';
     const selectedAssignment = findAssignment(ui.assignmentCourse, ui.selectedAssignmentId);
@@ -1045,7 +1056,7 @@
     const courseName = ui.reportCourse;
     const course = findCourse(courseName);
     const cards = byId('reportCards');
-    byId('reportCourse').innerHTML = courseOptions(courseName);
+    byId('reportCourse').innerHTML = courseOptions(courseName, true);
     if (!course) {
       reportProfileMarkup = '';
       byId('reportMetrics').innerHTML = '';
@@ -1077,7 +1088,7 @@
         }).length + asArray(record.missing).filter((item) => item.active !== false).length;
         const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
         const evidence = reportEvidenceForStudent(courseName, student, assessmentData, recordedDays);
-        const runningMark = runningMarkForEvidence(evidence, examWeight);
+        const runningMark = runningMarkForEvidence(evidence, examWeight, courseName);
         const evidenceLabel = evidence.length === 1 ? 'evidence item' : 'evidence items';
         return '<button type="button" class="report-card ' + (student === selectedStudent ? 'active' : '') + '" data-action="open-report-student" data-course="' + escapeAttr(courseName) + '" data-student="' + escapeAttr(student) + '"><span class="report-card-heading"><strong>' + escapeHtml(student) + '</strong><span>Open profile →</span></span><span class="report-card-running"><span>Running mark</span><strong>' + formatPercentage(runningMark) + '</strong><small>' + (evidence.length ? evidence.length + ' ' + evidenceLabel : 'Not assessed yet') + '</small></span><span class="report-card-stats"><span class="report-card-stat"><strong>' + countAbsences(record) + '</strong><span>A + E</span></span><span class="report-card-stat"><strong>' + lates + '</strong><span>Lates</span></span><span class="report-card-stat"><strong>' + open + '</strong><span>Open work</span></span></span></button>';
       }).join('') : '<p class="empty-copy">No students are on this active roster.</p>';
@@ -1092,7 +1103,7 @@
     const record = ensureRecord(courseName, selectedStudent);
     const lates = asArray(record.attendance).filter((entry) => entry.status === 'L').length;
     const evidence = reportEvidenceForStudent(courseName, selectedStudent, assessmentData, recordedDays);
-    const runningMark = runningMarkForEvidence(evidence, examWeight);
+    const runningMark = runningMarkForEvidence(evidence, examWeight, courseName);
     const evidenceRows = evidence.map((item) => '<li class="report-assignment report-evidence"><span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.detail) + '</small></span><span class="chip success">' + formatPercentage(item.percentage) + '</span></li>');
     const missingLegacy = asArray(record.missing).filter((item) => item.active !== false).map((item) => '<li class="report-assignment"><span><strong>' + escapeHtml(item.name) + '</strong><small>Legacy work item · Due ' + escapeHtml(formatShortDate(item.date)) + '</small></span><span class="chip warning">' + escapeHtml(item.status || 'Missing') + '</span></li>');
     const assignmentRows = reportAssignments.map((assignment) => {
@@ -1112,7 +1123,7 @@
       return !row.submitted && !row.notRequired;
     }).length + missingLegacy.length;
 
-    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div>' + runningMarkBreakdownMarkup(evidence, examWeight) + '</div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Entered marks and participation evidence use the agreed level scale. Pass is Level 4 (85%) in participation only. R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
+    reportProfileMarkup = '<section class="report-profile"><div class="report-profile-heading split-heading"><div><p class="panel-kicker">STUDENT PROFILE</p><h3>' + escapeHtml(selectedStudent) + '</h3><p>' + escapeHtml(courseName) + ' · ' + submitted + '/' + activeAssignments.length + ' current assignments submitted</p></div><div class="report-profile-actions"><button type="button" class="primary-button" data-action="report-add-note">＋ Add Note</button><button type="button" class="secondary-button" data-action="close-modal">Close</button></div></div><div class="running-mark-panel"><div><span>Current running mark</span><strong>' + formatPercentage(runningMark) + '</strong></div>' + runningMarkBreakdownMarkup(evidence, examWeight, courseName) + '</div><div class="report-summary-grid"><div class="report-summary-item"><strong>' + countAbsences(record) + '</strong><span>Total A + E</span></div><div class="report-summary-item"><strong>' + lates + '</strong><span>Total lates</span></div><div class="report-summary-item"><strong>' + outstanding + '</strong><span>Outstanding work</span></div><div class="report-summary-item"><strong>' + record.notes.length + '</strong><span>Notes</span></div></div><div class="report-profile-grid"><section class="report-section report-evidence-section"><h4>Assessment evidence</h4><p class="panel-help">Entered marks and participation evidence use the agreed level scale. Pass is Level 4 (85%) in participation only. R counts as 40% by default.</p>' + (evidenceRows.length ? '<ul class="report-assignment-list">' + evidenceRows.join('') + '</ul>' : '<p class="empty-copy">No marked assessment evidence yet.</p>') + '</section><section class="report-section"><h4>Assignments &amp; outstanding work</h4><p class="panel-help">Marked &amp; Handed Back work remains visible. Tests and quizzes appear in the assessment evidence above.</p>' + (assignmentItems ? '<ul class="report-assignment-list">' + assignmentItems + '</ul>' : '<p class="empty-copy">No assignments or missing work recorded.</p>') + '</section><section class="report-section"><div class="split-heading"><h4>Notes</h4><span class="panel-help">Edit or delete below.</span></div><div class="notes-list">' + renderNoteList(courseName, selectedStudent, 'No notes for this student yet.') + '</div></section></div></section>';
     
   }
 
@@ -1804,8 +1815,35 @@
     }
   }
 
+  function transitionToCareers() {
+    const civics = findCourse('Civics');
+    if (!civics || state.courses.courses.some(course => course.transition === 'civics-careers-2026-11-09') || findCourse('Careers')) return false;
+    // Save the complete current device data before the one-time roster-only transition.
+    const previous = JSON.stringify(state);
+    try {
+      localStorage.setItem('teacher_command_centre_before_careers_20261109', JSON.stringify(exportPayload()));
+      const careers = {
+        name: 'Careers', archived: false, students: [...civics.students],
+        startDate: '2026-11-09', transition: 'civics-careers-2026-11-09'
+      };
+      civics.archived = true;
+      state.courses.courses.splice(state.courses.courses.indexOf(civics) + 1, 0, careers);
+      state.studentData.students.Careers = Object.fromEntries(careers.students.map(name => [name, freshStudentRecord()]));
+      state.assignmentTracker.classes.Careers = { assignments: [] };
+      state.currentClass = 'Careers';
+      state.studentData.currentClass = 'Careers';
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return true;
+    } catch (error) {
+      state = JSON.parse(previous);
+      window.alert('Careers could not be created because the browser could not save the transition. Civics has been kept unchanged.');
+      return false;
+    }
+  }
+
   function init() {
     state = loadState();
+    transitionToCareers();
     ensureSelections();
     save(migratedLegacyData ? 'Local data migrated safely' : 'Local-first dashboard ready');
     window.teacherCommandCentreAssessments?.cleanEmptyStaleRows(state.courses.courses);
@@ -1822,4 +1860,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 })();
+
 
